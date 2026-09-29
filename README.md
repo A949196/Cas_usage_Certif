@@ -22,8 +22,7 @@ chômage de longue durée. Contraintes imposées par le sujet :
 - Concevoir, en seconde partie, une architecture d'industrialisation
   (API, Docker, CI/CD, MLflow, monitoring) intégrée au SI de l'agence.
 
-Texte intégral du sujet : `Sujet.docx` (hors dépôt, fourni par le centre
-d'examen).
+Texte intégral du sujet : `Sujet.docx` (hors dépôt).
 
 ## Axes de développement (feuille de route en 8 phases)
 
@@ -44,7 +43,7 @@ validée et le test scellé exécuté.
 
 ## État d'avancement
 
-- [x] **Étape 0 — Inventaire** : dépôt et ontologie (78 fiches) recensés.
+- [x] **Étape 0 — Inventaire** : dépôt création.
 - [x] **Étape 1 — Revue du cadrage** : §1 du notebook confronté à 9 fiches
       de méthodologie (entretien client, cartographie source, risques RGPD
       de croisement, datasheet Gebru, grille de décision, traçage
@@ -53,9 +52,14 @@ validée et le test scellé exécuté.
       incohérences (74 lignes, code ROME `W1401` non conforme à la
       nomenclature), absence de PII dans le texte libre, premier
       disparate impact (`nationalite_hors_ue`, DI ≈ 0,342 — signal
-      majeur), brouillon de datasheet et dictionnaire de variables.
-- [ ] **Étape 3 — Qualité et biais** : à venir (traitement des lignes
-      incohérentes et du code atypique, bilan éthique n°2).
+      majeur), brouillon de datasheet et dictionnaire de variables,
+      4 visualisations (distribution cible, âge, boxplot ancienneté,
+      heatmap cible × nationalité).
+- [x] **Étape 3 — Qualité et biais** : crosstab cible × nationalité sur
+      les 3 classes ; décisions tranchées sur les 74 lignes incohérentes
+      (valeur neutralisée + flag `anciennete_incoherente`) et sur le code
+      `W1401` (conservé, effectif au seuil de fiabilité) ; mise à l'échelle
+      actée pour l'Étape 4 ; bilan éthique n°2 en brouillon.
 - [ ] **Étape 4 — Préparation** : pipeline scikit-learn sans fuite,
       figeage des 4 scénarios.
 - [ ] **Étape 5 — Benchmark** : comparaison des modèles, mêmes folds.
@@ -66,7 +70,6 @@ validée et le test scellé exécuté.
 **Décisions encore ouvertes** (voir `notebook/use_case.ipynb`, §1.5) :
 - Périmètre exact du scénario S2 (retrait de la seule nationalité, ou
   aussi âge / INSEE / allocataire ?).
-- Traitement des 74 lignes incohérentes et du code ROME `W1401`.
 - Base légale d'usage de `nationalite_hors_ue` pour l'audit d'équité.
 - Définition retenue de l'« outcome positif » pour le disparate impact.
 
