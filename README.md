@@ -60,16 +60,18 @@ validée et le test scellé exécuté.
       (valeur neutralisée + flag `anciennete_incoherente`) et sur le code
       `W1401` (conservé, effectif au seuil de fiabilité) ; mise à l'échelle
       actée pour l'Étape 4 ; bilan éthique n°2 en brouillon.
-- [ ] **Étape 4 — Préparation** : pipeline scikit-learn sans fuite,
-      figeage des 4 scénarios.
+- [x] **Étape 4 — Préparation** : `features.py` (extraction département,
+      hors ontologie) et `pipeline.py` (4 `ColumnTransformer`, un par
+      scénario) créés avec 11 tests ; split stratifié 2000/500 ; S4 relu
+      strictement contre le sujet et corrigé (plus restreint que « S1 sans
+      texte » : ni `code_rome_vise`, ni `est_allocataire`, ni
+      `nationalite_hors_ue`).
 - [ ] **Étape 5 — Benchmark** : comparaison des modèles, mêmes folds.
 - [ ] **Étape 6 — Arbitrage** : décision à coût minimal, audit d'équité.
 - [ ] **Étape 7 — Communication** : note de recommandation client.
 - [ ] **Partie B (Industrialisation)** : non démarrée.
 
 **Décisions encore ouvertes** (voir `notebook/use_case.ipynb`, §1.5) :
-- Périmètre exact du scénario S2 (retrait de la seule nationalité, ou
-  aussi âge / INSEE / allocataire ?).
 - Base légale d'usage de `nationalite_hors_ue` pour l'audit d'équité.
 - Définition retenue de l'« outcome positif » pour le disparate impact.
 
@@ -82,7 +84,9 @@ notebook/
   journal-de-bord.ipynb       journal de bord (jour par jour)
 src/trajectoire_emploi/       code réutilisable (créé au fil du besoin,
                                pas de structure anticipée) — actuellement :
-                               fairness.py (disparate impact)
+                               fairness.py (disparate impact),
+                               features.py (extraction département),
+                               pipeline.py (préprocesseur par scénario)
 tests/                        tests pytest sur données synthétiques
 pyproject.toml                config pytest (pythonpath src/)
 requirements.txt              dépendances Python (3.11+)
