@@ -126,6 +126,23 @@ validée et le test scellé exécuté.
       découpage validé en 4 lots (Lot 1 : API/Docker/CI-CD — Lot 2 :
       MLflow/Monitoring — Lot 3 : Interface conseiller/Réentraînement —
       Lot 4 : Architecture/Dossier). Prochaine étape : Étape 8 (API).
+  - [x] **Étape 8 — API** : `features.py` enrichi de
+        `nettoyer_anciennete_incoherente` (refactor, code désormais partagé
+        entre notebook et API — évite la dérive train/serve) ;
+        `persistence.py` créé (packaging `.joblib` + métadonnées JSON,
+        5 clés obligatoires, 4 tests) ; pipeline final **réentraîné sur
+        train+test combinés** (2500 lignes, même architecture S2-LightGBM),
+        packagé dans `models/trajectoire_emploi_v1.joblib`/`.json`
+        (`metrics_holdout` = verdict du test scellé §7.4, jamais recalculé) ;
+        API FastAPI (`services/backend/app/`) avec `/health`, `/info`,
+        `/predict` (décision à coût minimal avec abstention, seuil 0,7) ;
+        logs structurés sans PII (`request_id`) ; 10 tests API + contract
+        test du modèle. **Réorganisation `services/backend` /
+        `services/frontend`** anticipant la dockerisation (Étape 9) :
+        `src/` et `models/` restent partagés à la racine (utilisés par le
+        notebook ET le backend), `services/backend/requirements.txt`
+        allégé pour une image de prod plus légère (pas de jupyter/xgboost),
+        `services/frontend/` réservé au Lot 3 (interface conseiller).
 
 **Décisions encore ouvertes** (voir `notebook/use_case.ipynb`, §1.5) :
 - Base légale d'usage de `nationalite_hors_ue` pour l'audit d'équité.
@@ -140,23 +157,47 @@ exécution du test scellé) n'est actuellement pas exclu par `.gitignore` —
 ## Structure du dépôt
 
 ```
-data/                        CSV du sujet (non versionné)
+data/                          CSV du sujet (non versionné)
 notebook/
-  use_case.ipynb              notebook de travail (cadrage → exploration → …)
-  journal-de-bord.ipynb       journal de bord (jour par jour)
-src/trajectoire_emploi/       code réutilisable (créé au fil du besoin,
-                               pas de structure anticipée) — actuellement :
-                               fairness.py (disparate impact),
-                               features.py (extraction département),
-                               pipeline.py (préprocesseur par scénario),
-                               evaluation.py (métriques métier),
-                               benchmark.py (comparaison scénarios × modèles),
-                               decision.py (décision à coût minimal),
-                               calibration.py (ECE, reliability diagram)
-tests/                        tests pytest sur données synthétiques
-pyproject.toml                config pytest (pythonpath src/)
-requirements.txt              dépendances Python (3.11+)
+  use_case.ipynb                notebook de travail (cadrage → exploration → …)
+  journal-de-bord.ipynb         journal de bord (jour par jour)
+src/trajectoire_emploi/         code réutilisable, PARTAGÉ entre le notebook
+                                 (entraînement) et services/backend/ (API) —
+                                 reste à la racine, n'appartient à aucun
+                                 service Docker en particulier :
+                                 fairness.py (disparate impact),
+                                 features.py (extraction département,
+                                   nettoyage ancienneté incohérente),
+                                 pipeline.py (préprocesseur par scénario),
+                                 evaluation.py (métriques métier),
+                                 benchmark.py (comparaison scénarios × modèles),
+                                 decision.py (décision à coût minimal),
+                                 calibration.py (ECE, reliability diagram),
+                                 persistence.py (packaging modèle .joblib+.json)
+models/                         modèle packagé (.joblib non versionné, .json
+                                 versionné) — artefact partagé, produit par le
+                                 notebook, consommé par services/backend/
+services/
+  backend/
+    app/                         API FastAPI (main.py, schemas.py, middleware.py)
+    requirements.txt              dépendances runtime allégées (pas de jupyter/
+                                   xgboost/pytest, image < 1 Go)
+  frontend/
+    README.md                    réservé au Lot 3 (interface conseiller Streamlit)
+tests/                          tests pytest (unitaires + contract test + API),
+                                 centralisés (teste src/ ET services/backend/app)
+.dockerignore                   exclusions du contexte de build Docker (racine)
+pyproject.toml                  config pytest (pythonpath src/ + services/backend)
+requirements.txt                dépendances Python dev complet (3.11+) : notebook,
+                                 tests, ET service — pour l'environnement local
 ```
+
+**Pourquoi `src/` et `models/` restent à la racine** (pas sous
+`services/backend/`) : ce sont des artefacts **partagés** avec le notebook
+d'entraînement (Partie A). Les déplacer sous `services/backend/`
+suggérerait à tort qu'ils appartiennent exclusivement à l'API. Le
+`Dockerfile` du backend (Étape 9) les copiera explicitement depuis la
+racine (contexte de build = racine du dépôt).
 
 ## Installation
 
@@ -170,3 +211,13 @@ uv pip install -r requirements.txt --python .venv/bin/python
 ```bash
 .venv/bin/python -m pytest
 ```
+
+## Lancer l'API (en local, hors Docker)
+
+```bash
+uv run --python .venv/bin/python uvicorn app.main:app --app-dir services/backend --reload
+```
+
+`--app-dir services/backend` indique à uvicorn où résoudre `app.main:app`
+sans avoir à transformer `services/` en package Python. Documentation
+interactive : `http://localhost:8000/docs`.
