@@ -114,14 +114,28 @@ validée et le test scellé exécuté.
       **Choix final retenu : S2-LightGBM avec décision à coût minimal**
       (divise par plus de deux le taux d'erreur critique 2→0 pour un coût
       modeste en F1 macro).
-- [ ] **Étape 7 — Communication** : note de recommandation client.
-- [ ] **Partie B (Industrialisation)** : non démarrée.
+- [x] **Étape 7 — Communication** : analyse d'erreurs (bloc principal = 
+      confusion 0↔1, pas 2→0), seuil d'abstention à 0,7 (~19 % de revue
+      humaine), note de recommandation client rédigée. **Verdict final sur
+      le test scellé (exécuté une seule fois)** : F1 macro = 0,722, taux
+      d'erreur critique 2→0 = **0,027**, DI sur les prédictions = **0,808**
+      (toujours au-dessus du seuil d'alerte) — confirme sur données jamais
+      vues les propriétés mesurées en validation croisée. **Partie A
+      (Modélisation) close.**
+- [ ] **Partie B (Industrialisation)** : pas encore démarrée techniquement ;
+      découpage validé en 4 lots (Lot 1 : API/Docker/CI-CD — Lot 2 :
+      MLflow/Monitoring — Lot 3 : Interface conseiller/Réentraînement —
+      Lot 4 : Architecture/Dossier). Prochaine étape : Étape 8 (API).
 
 **Décisions encore ouvertes** (voir `notebook/use_case.ipynb`, §1.5) :
 - Base légale d'usage de `nationalite_hors_ue` pour l'audit d'équité.
 - Valeur définitive du coût de l'erreur 2→0 dans la matrice de coûts
   (décision D3 — sensibilité testée en Étape 6, jamais formellement
   validée avec le métier).
+
+**Point de vigilance** : `outputs/split_scelle.json` (trace de l'unique
+exécution du test scellé) n'est actuellement pas exclu par `.gitignore` —
+à vérifier avant un commit si vous souhaitez qu'il reste local uniquement.
 
 ## Structure du dépôt
 
