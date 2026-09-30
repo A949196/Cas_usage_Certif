@@ -32,3 +32,44 @@ def decision_cout_minimal(probas: np.ndarray, matrice: np.ndarray = MATRICE_COUT
     # coûts_attendus[i, c] = somme_k probas[i, k] * matrice[k, c]
     couts_attendus = probas @ matrice
     return couts_attendus.argmin(axis=1)
+
+
+def cout_attendu_minimal(probas: np.ndarray, matrice: np.ndarray = MATRICE_COUTS) -> np.ndarray:
+    """Coût attendu de la meilleure décision, pour chaque échantillon.
+
+    C'est `min_c coût_attendu(c)` — un cas où même la meilleure option
+    reste coûteuse est un cas **ambigu** (les probabilités sont partagées
+    entre plusieurs classes de coûts très différents).
+    """
+    probas = np.asarray(probas)
+    couts_attendus = probas @ matrice
+    return couts_attendus.min(axis=1)
+
+
+def decision_avec_abstention(
+    probas: np.ndarray,
+    seuil_abstention: float,
+    matrice: np.ndarray = MATRICE_COUTS,
+) -> np.ndarray:
+    """Décision à coût minimal, avec abstention (fiche `725_Fallback_strategies_conception`).
+
+    Fiche appliquée : `725_Fallback_strategies_conception_essentiel.md`
+    (« seuil de rejet » : zone d'incertitude → revue humaine plutôt que
+    décision automatique forcée). Écart assumé par rapport à l'exemple
+    littéral de la fiche : celle-ci seuille sur `max(proba)` ; ici on
+    seuille sur le **coût attendu minimal** (`cout_attendu_minimal`) —
+    cohérent avec la décision à coût minimal déjà en place (un seuil sur la
+    probabilité brute ignorerait la matrice de coûts déjà justifiée).
+
+    Retourne un tableau d'objets : soit la classe prédite (int), soit la
+    chaîne `"revue_humaine"` si le coût attendu minimal dépasse le seuil.
+    """
+    probas = np.asarray(probas)
+    predictions = decision_cout_minimal(probas, matrice)
+    couts = cout_attendu_minimal(probas, matrice)
+
+    resultat = np.empty(len(probas), dtype=object)
+    incertain = couts > seuil_abstention
+    resultat[~incertain] = predictions[~incertain]
+    resultat[incertain] = "revue_humaine"
+    return resultat
