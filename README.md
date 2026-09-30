@@ -24,6 +24,35 @@ chômage de longue durée. Contraintes imposées par le sujet :
 
 Texte intégral du sujet : `Sujet.docx` (hors dépôt).
 
+## Matrice de coûts — pourquoi une métrique ne suffit pas
+
+Le F1 macro (ou l'accuracy) traite toutes les erreurs de la même façon.
+Le sujet impose l'inverse : une erreur **2 → 0** (usager à risque classé
+« retour rapide ») est bien plus grave qu'une erreur adjacente (0 → 1 ou
+1 → 2), car elle prive l'usager d'un accompagnement renforcé nécessaire.
+
+La matrice de coûts (posée en hypothèse au §1.4 du notebook, implémentée
+dans `src/trajectoire_emploi/evaluation.py::cout_moyen`) pondère chaque
+type d'erreur selon sa gravité réelle (2 → 0 pèse 10× plus qu'une erreur
+mineure). Elle sert à :
+
+- **départager des modèles à F1 macro identique** (cf. benchmark Étape 5 :
+  LightGBM et XGBoost ont le même F1 macro sur S1, mais pas le même coût
+  moyen — ils ne commettent pas les mêmes erreurs) ;
+- **révéler des compromis invisibles à l'accuracy** (un scénario peut avoir
+  un bon recall sur la classe à risque tout en ayant un coût moyen plus
+  élevé — cas mesuré du scénario texte seul, §5.2 du notebook) ;
+- **guider l'ajustement d'un seuil de décision** à l'Étape 6, comme demandé
+  explicitement par le sujet (« favoriser la diminution des erreurs
+  critiques ») ;
+- **traduire un score technique en langage métier** : « coût moyen par
+  usager » est plus parlant pour un décideur qu'un F1 macro.
+
+Limite assumée : les valeurs de la matrice (0, 1, 2, 10, 3, 0) sont une
+**hypothèse de travail arbitraire** — seule la structure (2→0 très
+supérieur au reste) compte. La sensibilité à ces valeurs est testée à
+l'Étape 6 (décision D3, jamais formellement validée avec le métier).
+
 ## Axes de développement (feuille de route en 8 phases)
 
 | Phase | Contenu | Partie |
@@ -66,7 +95,15 @@ validée et le test scellé exécuté.
       strictement contre le sujet et corrigé (plus restreint que « S1 sans
       texte » : ni `code_rome_vise`, ni `est_allocataire`, ni
       `nationalite_hors_ue`).
-- [ ] **Étape 5 — Benchmark** : comparaison des modèles, mêmes folds.
+- [x] **Étape 5 — Benchmark** : `evaluation.py` (métriques métier) et
+      `benchmark.py` (boucle scénarios × modèles, mêmes folds) créés avec
+      12 tests ; 4 scénarios × 6 modèles comparés en validation croisée
+      répétée. Meilleur compromis provisoire : **LightGBM/XGBoost sur
+      S1** (F1 macro ≈ 0,695). Découverte : sur S3 (texte seul), tous les
+      modèles convergent vers un score identique (seulement 10 vecteurs
+      TF-IDF distincts) — confirme le risque de contamination du texte
+      noté au cadrage. Test de robustesse (OOD) : extrapolation
+      silencieuse détectée sur un âge hors plage d'entraînement.
 - [ ] **Étape 6 — Arbitrage** : décision à coût minimal, audit d'équité.
 - [ ] **Étape 7 — Communication** : note de recommandation client.
 - [ ] **Partie B (Industrialisation)** : non démarrée.
@@ -86,7 +123,9 @@ src/trajectoire_emploi/       code réutilisable (créé au fil du besoin,
                                pas de structure anticipée) — actuellement :
                                fairness.py (disparate impact),
                                features.py (extraction département),
-                               pipeline.py (préprocesseur par scénario)
+                               pipeline.py (préprocesseur par scénario),
+                               evaluation.py (métriques métier),
+                               benchmark.py (comparaison scénarios × modèles)
 tests/                        tests pytest sur données synthétiques
 pyproject.toml                config pytest (pythonpath src/)
 requirements.txt              dépendances Python (3.11+)
