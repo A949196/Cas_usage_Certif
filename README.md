@@ -31,8 +31,7 @@ Le sujet impose l'inverse : une erreur **2 → 0** (usager à risque classé
 « retour rapide ») est bien plus grave qu'une erreur adjacente (0 → 1 ou
 1 → 2), car elle prive l'usager d'un accompagnement renforcé nécessaire.
 
-La matrice de coûts (posée en hypothèse au §1.4 du notebook, implémentée
-dans `src/trajectoire_emploi/evaluation.py::cout_moyen`) pondère chaque
+La matrice de coûts (implémentée dans `src/trajectoire_emploi/evaluation.py::cout_moyen`) pondère chaque
 type d'erreur selon sa gravité réelle (2 → 0 pèse 10× plus qu'une erreur
 mineure). Elle sert à :
 
@@ -104,24 +103,38 @@ validée et le test scellé exécuté.
       TF-IDF distincts) — confirme le risque de contamination du texte
       noté au cadrage. Test de robustesse (OOD) : extrapolation
       silencieuse détectée sur un âge hors plage d'entraînement.
-- [x] **Étape 6 — Arbitrage** : `decision.py` (décision à coût minimal) et
-      `calibration.py` (ECE, reliability diagram) créés avec 6 tests.
-      Calibration bonne (ECE ≈ 0,04-0,05). Découverte majeure : l'audit
-      d'équité refait sur les **prédictions** (pas l'étiquette) montre que
-      le modèle **amplifie** le biais sur S1 (DI ≈ 0,26-0,28 contre 0,342
-      sur l'étiquette), mais **repasse au-dessus du seuil d'alerte 4/5**
-      sur S2 (DI = 0,838) en retirant seulement `nationalite_hors_ue`.
-      **Choix final retenu : S2-LightGBM avec décision à coût minimal**
-      (divise par plus de deux le taux d'erreur critique 2→0 pour un coût
-      modeste en F1 macro).
+- [x] **Étape 6 — Arbitrage** (révisé) : `decision.py` (décision à coût
+      minimal) et `calibration.py` (ECE, reliability diagram) créés avec
+      6 tests. Calibration bonne (ECE ≈ 0,044-0,049). **Audit d'équité
+      entièrement refait par groupe** (`nationalite_hors_ue`), sous la
+      décision **réellement déployée** (coût minimal, pas argmax — l'audit
+      initial utilisait la mauvaise règle) : sous S1, le groupe hors-UE
+      est **mieux protégé** contre l'erreur critique 2→0 que le groupe
+      majoritaire (recall classe 2 = 0,804 vs 0,667 ; taux 2→0 = 0,011 vs
+      0,063) — le modèle utilise `nationalite_hors_ue` comme signal
+      corrélé à un risque réel. Sous S2 (sans cette variable), ce
+      renversement s'inverse : recall du groupe hors-UE tombe à 0,620
+      (sous le groupe majoritaire) et son taux 2→0 monte à **0,076, 7 fois
+      supérieur à S1**. Le DI agrégé sous la bonne règle (0,722, pas 0,838
+      — ce dernier chiffre venait d'un calcul sous argmax, jamais utilisé
+      en production) ne révèle pas ce coût ciblé. **Choix final maintenu :
+      S2-LightGBM avec décision à coût minimal**, mais l'argumentation est
+      révisée : retenu pour le risque légal de l'usage direct d'une
+      variable protégée (indépendant du sens de son effet mesuré), pas
+      parce que le DI « prouve » une correction — ce coût réel pour le
+      groupe hors-UE est documenté et devra être activement surveillé en
+      production (Étape 13). Détail complet en §6.4/§6.6 du notebook.
 - [x] **Étape 7 — Communication** : analyse d'erreurs (bloc principal = 
       confusion 0↔1, pas 2→0), seuil d'abstention à 0,7 (~19 % de revue
       humaine), note de recommandation client rédigée. **Verdict final sur
       le test scellé (exécuté une seule fois)** : F1 macro = 0,722, taux
       d'erreur critique 2→0 = **0,027**, DI sur les prédictions = **0,808**
       (toujours au-dessus du seuil d'alerte) — confirme sur données jamais
-      vues les propriétés mesurées en validation croisée. **Partie A
-      (Modélisation) close.**
+      vues les propriétés mesurées en validation croisée. **§7.5 ajouté** :
+      lecture par groupe des mêmes prédictions déjà scellées (pas de
+      nouvelle exécution) — confirme un taux d'abstention quasi double
+      pour le groupe hors-UE (28,6 % vs 15,5 %), signal opérationnel à
+      surveiller. **Partie A (Modélisation) close.**
 - [ ] **Partie B (Industrialisation)** : pas encore démarrée techniquement ;
       découpage validé en 4 lots (Lot 1 : API/Docker/CI-CD — Lot 2 :
       MLflow/Monitoring — Lot 3 : Interface conseiller/Réentraînement —
@@ -149,10 +162,11 @@ validée et le test scellé exécuté.
 - Valeur définitive du coût de l'erreur 2→0 dans la matrice de coûts
   (décision D3 — sensibilité testée en Étape 6, jamais formellement
   validée avec le métier).
-
-**Point de vigilance** : `outputs/split_scelle.json` (trace de l'unique
-exécution du test scellé) n'est actuellement pas exclu par `.gitignore` —
-à vérifier avant un commit si vous souhaitez qu'il reste local uniquement.
+- **D6 (nouvelle)** : le coût mesuré de S2 pour le groupe hors-UE (taux
+  2→0 multiplié par 7 vs S1, §6.4/§6.6 révisés) est-il acceptable en
+  production tel quel, ou faut-il explorer un seuil de décision différencié
+  par groupe (piste non implémentée) ? Question posée au métier/DPO, en
+  lien avec D5.
 
 ## Structure du dépôt
 
