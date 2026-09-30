@@ -104,13 +104,24 @@ validée et le test scellé exécuté.
       TF-IDF distincts) — confirme le risque de contamination du texte
       noté au cadrage. Test de robustesse (OOD) : extrapolation
       silencieuse détectée sur un âge hors plage d'entraînement.
-- [ ] **Étape 6 — Arbitrage** : décision à coût minimal, audit d'équité.
+- [x] **Étape 6 — Arbitrage** : `decision.py` (décision à coût minimal) et
+      `calibration.py` (ECE, reliability diagram) créés avec 6 tests.
+      Calibration bonne (ECE ≈ 0,04-0,05). Découverte majeure : l'audit
+      d'équité refait sur les **prédictions** (pas l'étiquette) montre que
+      le modèle **amplifie** le biais sur S1 (DI ≈ 0,26-0,28 contre 0,342
+      sur l'étiquette), mais **repasse au-dessus du seuil d'alerte 4/5**
+      sur S2 (DI = 0,838) en retirant seulement `nationalite_hors_ue`.
+      **Choix final retenu : S2-LightGBM avec décision à coût minimal**
+      (divise par plus de deux le taux d'erreur critique 2→0 pour un coût
+      modeste en F1 macro).
 - [ ] **Étape 7 — Communication** : note de recommandation client.
 - [ ] **Partie B (Industrialisation)** : non démarrée.
 
 **Décisions encore ouvertes** (voir `notebook/use_case.ipynb`, §1.5) :
 - Base légale d'usage de `nationalite_hors_ue` pour l'audit d'équité.
-- Définition retenue de l'« outcome positif » pour le disparate impact.
+- Valeur définitive du coût de l'erreur 2→0 dans la matrice de coûts
+  (décision D3 — sensibilité testée en Étape 6, jamais formellement
+  validée avec le métier).
 
 ## Structure du dépôt
 
@@ -125,7 +136,9 @@ src/trajectoire_emploi/       code réutilisable (créé au fil du besoin,
                                features.py (extraction département),
                                pipeline.py (préprocesseur par scénario),
                                evaluation.py (métriques métier),
-                               benchmark.py (comparaison scénarios × modèles)
+                               benchmark.py (comparaison scénarios × modèles),
+                               decision.py (décision à coût minimal),
+                               calibration.py (ECE, reliability diagram)
 tests/                        tests pytest sur données synthétiques
 pyproject.toml                config pytest (pythonpath src/)
 requirements.txt              dépendances Python (3.11+)
