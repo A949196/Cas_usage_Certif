@@ -1,0 +1,16 @@
+{
+  "modele": "S2-LightGBM",
+  "decision": "cout_minimal_avec_abstention",
+  "seuil_abstention": 0.7,
+  "date_execution_utc": "2026-09-30T08:28:03.341564+00:00",
+  "taux_revue_humaine_test": 0.17,
+  "metriques_test": {
+    "f1_macro": 0.722,
+    "recall_classe_2": 0.7027,
+    "kappa_pondere": 0.6883,
+    "taux_erreur_2_vers_0": 0.027,
+    "cout_moyen": 0.441
+  },
+  "disparate_impact_predictions_test": 0.808,
+  "avertissement": "Ce fichier trace l'unique exécution du test scellé. Ne pas réexécuter avec un autre modèle."
+}
