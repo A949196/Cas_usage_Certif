@@ -80,9 +80,11 @@ validée et le test scellé exécuté.
       incohérences (74 lignes, code ROME `W1401` non conforme à la
       nomenclature), absence de PII dans le texte libre, premier
       disparate impact (`nationalite_hors_ue`, DI ≈ 0,342 — signal
-      majeur), brouillon de datasheet et dictionnaire de variables,
+      majeur), datasheet Gebru (7 sections, **finalisée v1.0** — cf.
+      §2.5, section 7 complétée) et dictionnaire de variables,
       4 visualisations (distribution cible, âge, boxplot ancienneté,
-      heatmap cible × nationalité).
+      heatmap cible × nationalité). **`experiments.md`** : 5 runs
+      documentés, de la baseline au modèle de production.
 - [x] **Étape 3 — Qualité et biais** : crosstab cible × nationalité sur
       les 3 classes ; décisions tranchées sur les 74 lignes incohérentes
       (valeur neutralisée + flag `anciennete_incoherente`) et sur le code
@@ -172,6 +174,8 @@ validée et le test scellé exécuté.
 
 ```
 data/                          CSV du sujet (non versionné)
+experiments.md                 traçage des runs de modèle (5 runs, baseline →
+                                 production)
 notebook/
   use_case.ipynb                notebook de travail (cadrage → exploration → …)
   journal-de-bord.ipynb         journal de bord (jour par jour)
