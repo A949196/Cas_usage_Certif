@@ -1,6 +1,5 @@
 # Python 3.11+ — dépendances runtime du service backend UNIQUEMENT.
 # Volontairement plus léger que le requirements.txt racine (image < 1 Go visée) : pas de
-# jupyter/ipykernel/matplotlib/seaborn (dev notebook uniquement), pas de
 # xgboost (le modèle final packagé est LightGBM seul), pas de pytest
 # (tests exclus de l'image de prod, cf. `.dockerignore`).
 
@@ -16,3 +15,8 @@ pydantic==2.13.5
 fastapi==0.115.6
 loguru==0.7.3
 uvicorn[standard]==0.34.0
+
+# Observabilité
+prometheus-fastapi-instrumentator==7.0.0
+prometheus-client==0.21.0
+

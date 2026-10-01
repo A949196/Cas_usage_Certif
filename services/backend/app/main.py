@@ -7,6 +7,10 @@ complet (préprocesseur + classifieur).
 Le feature engineering appliqué ici (département, ancienneté incohérente)
 réutilise **exactement** les mêmes fonctions que le notebook
 (`trajectoire_emploi.features`).
+
+Observabilité :
+`/metrics` expose les métriques HTTP automatiques (latence, volume, codes
+retour) via `prometheus-fastapi-instrumentator`.
 """
 
 from __future__ import annotations
@@ -20,6 +24,8 @@ from typing import Any
 import pandas as pd
 from fastapi import FastAPI, HTTPException, status
 from loguru import logger
+from prometheus_client import Counter
+from prometheus_fastapi_instrumentator import Instrumentator
 
 SRC_DIR = Path(__file__).resolve().parents[3] / "src"
 if str(SRC_DIR) not in sys.path:
@@ -76,6 +82,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.add_middleware(LoggingMiddleware)
+
+# Observabilité : /metrics (HTTP auto) + métrique métier.
+# include_in_schema=False : /metrics n'est pas un endpoint fonctionnel
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+
+DECISIONS = Counter(
+    "trajectoire_emploi_decisions_total",
+    "Nombre de décisions rendues par /predict, par type de décision",
+    ["decision"],
+)
 
 
 def _construire_dataframe(item: DemandeurInput) -> pd.DataFrame:
@@ -144,6 +160,8 @@ async def predict(item: DemandeurInput) -> PredictionResponse:
     else:
         prediction = int(resultat)
         decision_label = LIBELLE_CLASSE[prediction]
+
+    DECISIONS.labels(decision=decision_label).inc()
 
     return PredictionResponse(
         prediction=prediction,
