@@ -58,6 +58,10 @@ models/*.joblib
 models/*.pkl
 models/*.h5
 !models/.gitkeep
+# Exception : modèle de production packagé (404 Ko), nécessaire pour que
+# Docker/CI puissent construire et tester l'API sans dépendre d'un run
+# notebook complet (cf. Étape 9/10, décision actée avec l'utilisateur).
+!models/trajectoire_emploi_v1.joblib
 
 # Cache HuggingFace
 .cache/
