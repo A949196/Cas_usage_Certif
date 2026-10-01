@@ -1,0 +1,21 @@
+# Un seul service pour l'instant (`backend`) — `frontend rejoindra ce fichier quand il existera
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: services/backend/Dockerfile
+    image: trajectoire-emploi-api:v0.1.0-api
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+networks:
+  default:
+    driver: bridge
