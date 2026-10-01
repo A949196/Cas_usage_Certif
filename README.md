@@ -65,10 +65,6 @@ l'Étape 6 (décision D3, jamais formellement validée avec le métier).
 | 7. Surveiller | monitoring, dérive, réentraînement | B |
 | 8. Architecturer & défendre | archi cible, dossier, soutenance | B |
 
-**Partie A** (modélisation) en cours. **Partie B** (industrialisation) non
-démarrée — débute uniquement sur décision explicite, une fois la Partie A
-validée et le test scellé exécuté.
-
 ## État d'avancement
 
 - [x] **Étape 0 — Inventaire** : dépôt création.
@@ -170,10 +166,72 @@ validée et le test scellé exécuté.
       `docker compose build` + vérification `/health` sur le conteneur
       démarré). Portée volontairement limitée au gate test→build (pas de
       push GHCR, ce dépôt n'a pas encore de remote GitHub actif) —
-      **Lot 1 (service déployable) clos**. Prochaine étape : Lot 2
-      (Étape 11 — MLflow, Étape 13 — Monitoring).
+      **Lot 1 (service déployable) clos**.
+- [x] **Étape 11 — MLflow** : `scripts/log_experiments_mlflow.py`
+      reloggue les 5 runs d'`experiments.md` vers MLflow (params +
+      métriques + tag verdict), capitalisant sur le traçage existant sans
+      le remplacer. `mlruns/` ajouté au `.gitignore` (artefact local).
+      Vérifié : serveur `mlflow ui` réellement lancé, API interrogée —
+      5 runs comparables dans l'expérience `trajectoire_emploi`.
+- [x] **Étape 13.1 — Instrumentation Prometheus** :
+      `prometheus-fastapi-instrumentator` sur `services/backend/app/main.py`
+      — `/metrics` (métriques HTTP auto : latence, volume, codes retour),
+      absent du schéma OpenAPI (`include_in_schema=False`) ; `Counter`
+      métier `trajectoire_emploi_decisions_total` labellé par décision
+      (4 valeurs bornées, jamais de `request_id` en label). 3 tests
+      ajoutés. Vérifié réellement : `/metrics` interrogé dans le vrai
+      conteneur Docker après un `/predict`, compteur incrémenté, healthcheck
+      toujours `healthy`.
+- [x] **Étape 13.2 — Stack Prometheus + Grafana** : `observability/`
+      (config Prometheus + provisioning Grafana datasource/dashboards,
+      pas de clic manuel) ; `docker-compose.yml` étendu (3 services,
+      `depends_on: condition: service_healthy` en cascade). **Testé
+      réellement, stack complète lancée** : les 3 services démarrent
+      dans l'ordre et passent `healthy` ; Prometheus scrape `backend:8000`
+      (`up{job="backend"}=1`, confirmé via son API) ; Grafana interroge
+      Prometheus via la datasource provisionnée (`readOnly: true` —
+      confirme le provisioning, pas un clic manuel) ; **test de la panne
+      muette**: `docker compose stop backend` → `up` bascule
+      à `0` en ~15s, confirmant que c'est le seul signal fiable de panne.
+- [x] **Étape 13.3 — Dashboard Grafana** :
+      `observability/grafana/provisioning/dashboards/trajectoire_emploi_prod.json`
+      — 3 panels provisionnés : **Vie** (`up{job="backend"}`),
+      **Vitesse** (p95 par route via `histogram_quantile` sur
+      `http_request_duration_seconds_bucket`), **Comportement**
+      (répartition des décisions prédites, `rate(...)` par label). Vérifié
+      réellement : dashboard présent dans `GET /api/search` sans import
+      manuel ; trafic généré sur l'API réelle.
+- [x] **Étape 13.4 — Dérive (PSI/KS/Chi²) en notebook** :
+      `src/trajectoire_emploi/drift.py` (PSI, KS, Chi², diagnostic data vs
+      concept drift) créé avec 11 tests. Notebook §9 : démonstration
+      **train vs test comme proxy** (pas de vrai trafic de production à
+      ce stade, limite assumée explicitement) — aucun signal de dérive
+      détecté (attendu sur un split stratifié propre), AUC stable
+      (0,838 → 0,856). **Pourquoi ici et pas dans Grafana** : PSI/KS/Chi²
+      sont des mesures batch (calculées a posteriori sur un historique),
+      Grafana n'affiche que ce qu'un service expose en HTTP en continu —
+      y mettre un panel PSI produirait un « No data » permanent, un
+      dashboard qui ment (fiche 615).
+- [x] **Étape 13.5 — Runbook + évaluation continue** :
+      `RUNBOOK.md` (4 procédures : Service KO, Latence dégradée, Métrique
+      modèle dégradée, Rollback — seuils reliés aux panels réels du
+      13.3) ; `scripts/evaluate_model.py` : garde-fou CI sur
+      seuils bloquants. `data/reference_set.csv` (= ancien `X_test`,
+      figé, réutilisation explicitement actée) + `data/reference_baseline.json`
+      (golden run gelé). **Limite assumée et documentée dans le script** :
+      le modèle de production a été réentraîné sur train+test combinés
+      (§8.1) — il a donc déjà vu ce jeu, les métriques du golden run sont
+      artificiellement hautes (F1 macro ≈ 0,94) ; ce script détecte des
+      **régressions de code** (feature engineering cassé, seuil mal
+      branché). Seuils de tolérance justifiés par la variance mesurée 
+      (pas choisis à vue) : `f1_macro` par bootstrap (500 ré-échantillonnages,
+      sigma ≈ 0,012, tolérance 0,05 > 2σ) ; `taux_erreur_2_vers_0` par
+      l'écart-type inter-folds de l'Étape 5 :
+      sigma ≈ 0,043 sur 15 folds, tolérance 0,09 > 2σ. 6 tests unitaires sur la
+      logique de seuils. Job CI `evaluate-model`
+      (`needs: test`) branché dans `.github/workflows/ci.yml`.
 
-**Décisions encore ouvertes** (voir `notebook/use_case.ipynb`, §1.5) :
+**Décisions encore ouvertes** (voir `notebook/use_case.ipynb`) :
 - Base légale d'usage de `nationalite_hors_ue` pour l'audit d'équité.
 - Valeur définitive du coût de l'erreur 2→0 dans la matrice de coûts
   (décision D3 — sensibilité testée en Étape 6, jamais formellement
@@ -205,7 +263,8 @@ src/trajectoire_emploi/         code réutilisable, PARTAGÉ entre le notebook
                                  benchmark.py (comparaison scénarios × modèles),
                                  decision.py (décision à coût minimal),
                                  calibration.py (ECE, reliability diagram),
-                                 persistence.py (packaging modèle .joblib+.json)
+                                 persistence.py (packaging modèle .joblib+.json),
+                                 drift.py (PSI, KS, Chi², diagnostic drift)
 models/                         modèle packagé — **`.joblib` ET `.json`
                                  versionnés** (exception ciblée au
                                  `.gitignore`, 404 Ko, nécessaire pour que
@@ -222,12 +281,25 @@ services/
                                    non-root, libgomp1 pour LightGBM, healthcheck)
   frontend/
     README.md                    réservé au Lot 3 (interface conseiller Streamlit)
-docker-compose.yml              orchestration locale (service backend, healthcheck)
-.github/workflows/ci.yml        CI : pytest → build Docker (gate test→build)
+docker-compose.yml              orchestration locale (backend + prometheus + grafana)
+observability/
+  prometheus/prometheus.yml       config de scrape (cible : backend:8000/metrics)
+  grafana/provisioning/
+    datasources/datasource.yml      datasource Prometheus (uid fixe)
+    dashboards/dashboards.yml       provider (charge tout JSON de ce dossier)
+    dashboards/trajectoire_emploi_prod.json   dashboard (vie/vitesse/comportement)
+.github/workflows/ci.yml        CI : pytest → evaluate-model → build Docker
+scripts/
+  log_experiments_mlflow.py       reloggue experiments.md vers MLflow (Étape 11)
+  evaluate_model.py                garde-fou CI sur seuils bloquants (Étape 13.5)
+RUNBOOK.md                       4 procédures d'astreinte (Étape 13.5)
+data/
+  reference_set.csv                jeu de référence figé (= ancien X_test, versionné)
+  reference_baseline.json          golden run gelé (métriques de référence)
 tests/                          tests pytest (unitaires + contract test + API),
                                  centralisés (teste src/ ET services/backend/app)
 .dockerignore                   exclusions du contexte de build Docker (racine)
-pyproject.toml                  config pytest (pythonpath src/ + services/backend)
+pyproject.toml                  config pytest (pythonpath src/ + services/backend + scripts)
 requirements.txt                dépendances Python dev complet (3.11+) : notebook,
                                  tests, ET service — pour l'environnement local
 ```
@@ -235,17 +307,45 @@ requirements.txt                dépendances Python dev complet (3.11+) : notebo
 ## Docker
 
 ```bash
-docker compose up --build        # construit l'image et démarre le backend
-docker compose ps                 # doit afficher "healthy" après ~15-30s
+docker compose up --build        # backend + prometheus + grafana
+docker compose ps                 # les 3 services doivent passer "healthy"
 curl http://localhost:8000/health
+curl http://localhost:8000/metrics   # métriques Prometheus (HTTP + métier)
+curl http://localhost:9090/api/v1/targets   # vérifie que Prometheus scrape le backend
+# Grafana : http://localhost:3001 (admin/admin), datasource Prometheus préconfigurée
 docker compose down
 ```
 
 ## CI/CD
 
-`.github/workflows/ci.yml` : job `test` (pytest) → job `build`
-(`needs: test`, build Docker + vérification `/health`). Portée limitée au
-gate test→build à ce stade — pas de push vers un registre.
+`.github/workflows/ci.yml` : job `test` (pytest) → jobs `evaluate-model`
+(seuils bloquants, fiche 517) et `build` (Docker + `/health`), tous deux
+`needs: test`. Portée limitée au gate — pas de push vers un registre.
+
+```bash
+# Reproduire le gate d'évaluation continue en local :
+.venv/bin/python scripts/evaluate_model.py              # chemin vert attendu
+.venv/bin/python scripts/evaluate_model.py --degrade     # chemin rouge (exit 1)
+.venv/bin/python scripts/evaluate_model.py --freeze-baseline   # regeler le golden run
+```
+
+## Runbook
+
+`RUNBOOK.md` : 4 procédures d'astreinte (Service KO, Latence dégradée,
+Métrique modèle dégradée, Rollback), seuils reliés aux panels Grafana
+réels.
+
+## MLflow (traçage des expériences)
+
+```bash
+.venv/bin/python scripts/log_experiments_mlflow.py   # reloggue experiments.md
+.venv/bin/mlflow ui                                   # http://localhost:5000
+```
+
+Capitalise sur `experiments.md` (qui reste la source de vérité lisible
+humainement) : les 5 mêmes runs sont reloggués vers MLflow pour la
+comparaison outillée dans le temps (params, métriques, tag verdict).
+`mlruns/` est local, non versionné.
 
 ## Installation
 
