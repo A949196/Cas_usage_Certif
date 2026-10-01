@@ -26,6 +26,22 @@ jobs:
       - name: Tests (unitaires + contract test modèle + API)
         run: pytest -v
 
+  evaluate-model:
+    needs: test  # ← même garde-fou : pas de vérif modèle si le code casse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Évaluation continue — seuils bloquants (fiche 517)
+        run: python scripts/evaluate_model.py
+
   build:
     needs: test  # ← garde-fou : pas de build si les tests cassent
     runs-on: ubuntu-latest

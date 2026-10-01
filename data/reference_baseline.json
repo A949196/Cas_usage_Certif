@@ -1,0 +1,8 @@
+{
+  "f1_macro": 0.9357192253211849,
+  "recall_classe_2": 1.0,
+  "kappa_pondere": 0.9241405863263847,
+  "taux_erreur_2_vers_0": 0.0,
+  "cout_moyen": 0.07192575406032482,
+  "taux_revue_humaine": 0.138
+}
