@@ -45,6 +45,11 @@ data/*.csv
 data/*.parquet
 data/*.json
 !data/.gitkeep
+# Exceptions : jeu de référence figé + golden run gelé (fiche 517,
+# Étape 13.5) — nécessaires pour que le garde-fou CI fonctionne depuis un
+# git clone propre, comme le modèle packagé ci-dessous.
+!data/reference_set.csv
+!data/reference_baseline.json
 
 # Build / distribution
 build/
@@ -60,12 +65,15 @@ models/*.h5
 !models/.gitkeep
 # Exception : modèle de production packagé (404 Ko), nécessaire pour que
 # Docker/CI puissent construire et tester l'API sans dépendre d'un run
-# notebook complet (cf. Étape 9/10, décision actée avec l'utilisateur).
 !models/trajectoire_emploi_v1.joblib
 
 # Cache HuggingFace
 .cache/
 ~/.cache/huggingface/
+
+# MLflow — artefact local de tracking, régénéré par le script de logging
+mlruns/
+mlartifacts/
 
 # Docker
 .dockerignore
