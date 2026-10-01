@@ -137,27 +137,41 @@ validée et le test scellé exécuté.
       nouvelle exécution) — confirme un taux d'abstention quasi double
       pour le groupe hors-UE (28,6 % vs 15,5 %), signal opérationnel à
       surveiller. **Partie A (Modélisation) close.**
-- [ ] **Partie B (Industrialisation)** : pas encore démarrée techniquement ;
-      découpage validé en 4 lots (Lot 1 : API/Docker/CI-CD — Lot 2 :
-      MLflow/Monitoring — Lot 3 : Interface conseiller/Réentraînement —
-      Lot 4 : Architecture/Dossier). Prochaine étape : Étape 8 (API).
-  - [x] **Étape 8 — API** : `features.py` enrichi de
-        `nettoyer_anciennete_incoherente` (refactor, code désormais partagé
-        entre notebook et API — évite la dérive train/serve) ;
-        `persistence.py` créé (packaging `.joblib` + métadonnées JSON,
-        5 clés obligatoires, 4 tests) ; pipeline final **réentraîné sur
-        train+test combinés** (2500 lignes, même architecture S2-LightGBM),
-        packagé dans `models/trajectoire_emploi_v1.joblib`/`.json`
-        (`metrics_holdout` = verdict du test scellé §7.4, jamais recalculé) ;
-        API FastAPI (`services/backend/app/`) avec `/health`, `/info`,
-        `/predict` (décision à coût minimal avec abstention, seuil 0,7) ;
-        logs structurés sans PII (`request_id`) ; 10 tests API + contract
-        test du modèle. **Réorganisation `services/backend` /
-        `services/frontend`** anticipant la dockerisation (Étape 9) :
-        `src/` et `models/` restent partagés à la racine (utilisés par le
-        notebook ET le backend), `services/backend/requirements.txt`
-        allégé pour une image de prod plus légère (pas de jupyter/xgboost),
-        `services/frontend/` réservé au Lot 3 (interface conseiller).
+- [x] **Étape 8 — API** : `features.py` enrichi de
+      `nettoyer_anciennete_incoherente` (refactor, code désormais partagé
+      entre notebook et API — évite la dérive train/serve) ;
+      `persistence.py` créé (packaging `.joblib` + métadonnées JSON,
+      5 clés obligatoires, 4 tests) ; pipeline final **réentraîné sur
+      train+test combinés** (2500 lignes, même architecture S2-LightGBM),
+      packagé dans `models/trajectoire_emploi_v1.joblib`/`.json`
+      (`metrics_holdout` = verdict du test scellé §7.4, jamais recalculé) ;
+      API FastAPI (`services/backend/app/`) avec `/health`, `/info`,
+      `/predict` (décision à coût minimal avec abstention, seuil 0,7) ;
+      logs structurés sans PII (`request_id`) ; 10 tests API + contract
+      test du modèle. **Réorganisation `services/backend` /
+      `services/frontend`** anticipant la dockerisation (Étape 9) :
+      `src/` et `models/` restent partagés à la racine (utilisés par le
+      notebook ET le backend), `services/backend/requirements.txt`
+      allégé pour une image de prod plus légère (pas de jupyter/xgboost),
+      `services/frontend/` réservé au Lot 3 (interface conseiller).
+- [x] **Étape 9 — Docker** : `services/backend/Dockerfile` (base
+      `python:3.11-slim`, user non-root, `libgomp1` ajouté — requis par
+      LightGBM au runtime, absent de l'image slim par défaut, détecté en
+      testant réellement le conteneur) ; `docker-compose.yml` (service
+      `backend`, healthcheck). **Modèle packagé versionné dans Git**
+      (`models/trajectoire_emploi_v1.joblib`, 404 Ko — exception ciblée
+      au `.gitignore`, nécessaire pour que Docker/CI fonctionnent sans
+      dépendre d'un run notebook complet). Image testée de bout en bout,
+       `docker exec whoami` → `appuser`,
+      `docker compose ps` → `healthy`, `/health` `/info` `/predict`
+      (200 et 422) vérifiés sur le conteneur réel.
+- [x] **Étape 10 — CI/CD** : `.github/workflows/ci.yml` — job `test`
+      (pytest sur la suite complète) → job `build` (`needs: test`,
+      `docker compose build` + vérification `/health` sur le conteneur
+      démarré). Portée volontairement limitée au gate test→build (pas de
+      push GHCR, ce dépôt n'a pas encore de remote GitHub actif) —
+      **Lot 1 (service déployable) clos**. Prochaine étape : Lot 2
+      (Étape 11 — MLflow, Étape 13 — Monitoring).
 
 **Décisions encore ouvertes** (voir `notebook/use_case.ipynb`, §1.5) :
 - Base légale d'usage de `nationalite_hors_ue` pour l'audit d'équité.
@@ -192,16 +206,24 @@ src/trajectoire_emploi/         code réutilisable, PARTAGÉ entre le notebook
                                  decision.py (décision à coût minimal),
                                  calibration.py (ECE, reliability diagram),
                                  persistence.py (packaging modèle .joblib+.json)
-models/                         modèle packagé (.joblib non versionné, .json
-                                 versionné) — artefact partagé, produit par le
-                                 notebook, consommé par services/backend/
+models/                         modèle packagé — **`.joblib` ET `.json`
+                                 versionnés** (exception ciblée au
+                                 `.gitignore`, 404 Ko, nécessaire pour que
+                                 Docker/CI fonctionnent sans dépendre d'un
+                                 run notebook complet) — artefact produit
+                                 par le notebook, consommé par
+                                 services/backend/
 services/
   backend/
     app/                         API FastAPI (main.py, schemas.py, middleware.py)
     requirements.txt              dépendances runtime allégées (pas de jupyter/
                                    xgboost/pytest, image < 1 Go)
+    Dockerfile                    image du service (python:3.11-slim, user
+                                   non-root, libgomp1 pour LightGBM, healthcheck)
   frontend/
     README.md                    réservé au Lot 3 (interface conseiller Streamlit)
+docker-compose.yml              orchestration locale (service backend, healthcheck)
+.github/workflows/ci.yml        CI : pytest → build Docker (gate test→build)
 tests/                          tests pytest (unitaires + contract test + API),
                                  centralisés (teste src/ ET services/backend/app)
 .dockerignore                   exclusions du contexte de build Docker (racine)
@@ -210,12 +232,20 @@ requirements.txt                dépendances Python dev complet (3.11+) : notebo
                                  tests, ET service — pour l'environnement local
 ```
 
-**Pourquoi `src/` et `models/` restent à la racine** (pas sous
-`services/backend/`) : ce sont des artefacts **partagés** avec le notebook
-d'entraînement (Partie A). Les déplacer sous `services/backend/`
-suggérerait à tort qu'ils appartiennent exclusivement à l'API. Le
-`Dockerfile` du backend (Étape 9) les copiera explicitement depuis la
-racine (contexte de build = racine du dépôt).
+## Docker
+
+```bash
+docker compose up --build        # construit l'image et démarre le backend
+docker compose ps                 # doit afficher "healthy" après ~15-30s
+curl http://localhost:8000/health
+docker compose down
+```
+
+## CI/CD
+
+`.github/workflows/ci.yml` : job `test` (pytest) → job `build`
+(`needs: test`, build Docker + vérification `/health`). Portée limitée au
+gate test→build à ce stade — pas de push vers un registre.
 
 ## Installation
 
