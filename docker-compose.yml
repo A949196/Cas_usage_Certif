@@ -1,4 +1,7 @@
-# Un seul service pour l'instant (`backend`) — `frontend rejoindra ce fichier quand il existera
+# `backend`— API de scoring.
+# `frontend` rejoindra ce fichier au Lot 3 (interface conseiller, pas encore créé).
+# `prometheus`/`grafana` — observabilité : scrape
+# `backend:8000/metrics`, dashboard provisionné (pas d'import manuel).
 
 services:
   backend:
@@ -15,6 +18,36 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    depends_on:
+      prometheus:
+        condition: service_healthy
 
 networks:
   default:
