@@ -207,6 +207,35 @@ l'Étape 6 (décision D3, jamais formellement validée avec le métier).
       (`/_stcore/health`). `httpx` épinglé explicitement dans
       `requirements.txt` (requis en dur par `TestClient`, jusqu'ici tiré en
       transitif via `jupyter` — fonctionnel mais fragile).
+- [x] **Étape 14 — Réentraînement gardé** :
+      - la table `predictions` étendue aux 7 champs bruts de
+        `DemandeurInput` (incl. `synthese_entretien`, texte libre
+        potentiellement identifiant) pour permettre la jointure
+        feedbacks / predictions exigée par le réentraînement ;
+      - le modèle de production a déjà vu `reference_set.csv` à
+        l'entraînement (fusion train+test) — toute comparaison
+        candidat/production sur ce jeu est **structurellement biaisée en
+        défaveur du candidat** (documenté en dur dans `retrain.py`,
+        confirmé empiriquement : le candidat, à généralisation
+        authentique, perd face à la production, à métriques gonflées) ;
+      - le trigger GitHub Actions (`retrain.yml`) démontre le
+        mécanisme (garde-seuil sur `used_for_training = 0`) sur des
+        données de démonstration dans le job, pas une opération
+        réelle continue.
+
+      `src/trajectoire_emploi/retrain_data.py` : reconstruction
+      déterministe de `X_train`/`y_train` ;
+      garde-fou anti-dérive `verifier_coherence_reference_set` (vérifié
+      réellement. `scripts/retrain.py` : réutilise la Pipeline de production à
+      l'identique (S2 + `LGBMClassifier(random_state=42)`), contract test,
+      garde-seuil, candidat toujours packagé (`trajectoire_emploi_candidate.joblib`,
+      jamais promu silencieusement), décision journalisée
+      `scripts/promotion.py::decide_promotion()` :
+      fonction (plancher + non-régression f1_macro ±0,05 /
+      taux_erreur_2_vers_0 ±0,09 + gain minimum `recall_classe_2` ≥
+      production + 0,01), 7 tests sur métriques mockées. Vérifié
+      contre `feedback.db` produit par le conteneur Docker : 
+      jointure correcte, entraînement réel (~2 s), rejet journalisé. 
 
 **Décisions encore ouvertes** :
 - Base légale d'usage de `nationalite_hors_ue` pour l'audit d'équité.
@@ -221,7 +250,32 @@ l'Étape 6 (décision D3, jamais formellement validée avec le métier).
 - **D7** : durée de rétention des `predictions`/`feedbacks`
   stockés (*« décider combien de temps on garde les
   feedbacks, et pourquoi »*) — non encore tranchée, à documenter avant
-  mise en production réelle.
+  mise en production réelle. Devenue plus pressante depuis l'Étape 14 :
+  la table `predictions` stocke désormais aussi `synthese_entretien`
+  (texte libre potentiellement identifiant), nécessaire au réentraînement
+  mais qui aggrave l'enjeu de rétention.
+- **D8** : le biais structurel candidat/production sur`reference_set.csv` 
+  (la production a déjà vu ce jeu, pas le candidat) rend toute comparaison directe 
+  optimiste pour la production.
+  Accepté et documenté (cf. `scripts/retrain.py`, même posture que le golden run gonflé d'`evaluate_model.py`) ; piste non retenue faute de volume.
+
+## Réentraînement gardé
+
+```bash
+# Démonstration locale complète (entraîne un vrai candidat, ~2 s) :
+.venv/bin/python scripts/retrain.py --force
+
+# Simule le garde-seuil normal (200 feedbacks non consommés requis) :
+.venv/bin/python scripts/retrain.py
+
+# Seuil abaissé pour une démo avec peu de feedbacks :
+.venv/bin/python scripts/retrain.py --min-feedback 5
+```
+
+Nécessite `data/dataset_trajectoire_emploi_Sujet.csv` (dataset brut,
+non versionné) pour tout run au-delà du garde-seuil — c'est pourquoi le
+workflow `.github/workflows/retrain.yml` ne démontre que le **mécanisme de
+trigger** (garde-seuil sur données de démonstration seedées)..
 
 ## Structure du dépôt
 
@@ -246,14 +300,19 @@ src/trajectoire_emploi/         code réutilisable, PARTAGÉ entre le notebook
                                   persistence.py (packaging modèle .joblib+.json),
                                   drift.py (PSI, KS, Chi², diagnostic drift),
                                   feedback_store.py (store SQLite predictions/
-                                    feedbacks conseillers)
+                                    feedbacks conseillers),
+                                  retrain_data.py (reconstruction déterministe
+                                    du split train/test, Étape 14)
 models/                         modèle packagé — **`.joblib` ET `.json`
                                   versionnés** (exception ciblée au
                                   `.gitignore`, 404 Ko, nécessaire pour que
                                   Docker/CI fonctionnent sans dépendre d'un
                                   run notebook complet) — artefact produit
                                   par le notebook, consommé par
-                                  services/backend/
+                                  services/backend/ ;
+                                  trajectoire_emploi_candidate.joblib/.json
+                                  (Étape 14, jamais versionné, régénéré par
+                                  scripts/retrain.py)
 services/
   backend/
     app/                         API FastAPI (main.py, schemas.py, middleware.py)
@@ -274,17 +333,20 @@ observability/
     dashboards/dashboards.yml       provider (charge tout JSON de ce dossier)
     dashboards/trajectoire_emploi_prod.json   dashboard (vie/vitesse/comportement)
 .github/workflows/ci.yml        CI : pytest → evaluate-model → build Docker
+.github/workflows/retrain.yml   démonstration du mécanisme de trigger (Étape 14)
 scripts/
   log_experiments_mlflow.py       reloggue experiments.md vers MLflow
   evaluate_model.py                garde-fou CI sur seuils bloquants 
   generer_trafic_test.py            envoie un trafic synthetique a l'API reelle
   comparer_derive_production.py     compare ce trafic a data/reference_set.csv
+  retrain.py                        réentraînement gardé (candidat vs production, Étape 14)
+  promotion.py                      decide_promotion() — politique pure, testée
 RUNBOOK.md                       4 procédures d'astreinte
 data/
   reference_set.csv                jeu de référence figé (= ancien X_test, versionné)
   reference_baseline.json          golden run gelé (métriques de référence)
-  runtime/                        store SQLite predictions/feedbacks,
-                                   jamais versionné (généré à l'exécution)
+  runtime/                        store SQLite predictions/feedbacks +
+                                   retrain_log.jsonl, jamais versionné (généré à l'exécution)
 tests/                          tests pytest (unitaires + contract test + API),
                                  centralisés (tests src/ ET services/backend/app)
 .dockerignore                   exclusions du contexte de build Docker (racine)

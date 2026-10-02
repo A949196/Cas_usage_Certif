@@ -191,6 +191,7 @@ async def predict(item: DemandeurInput, request: Request) -> PredictionResponse:
             classe_predite=prediction,
             decision=decision_label,
             probabilites=probas_par_classe,
+            features=item.model_dump(),
         )
     except Exception:
         # Ne bloque jamais /predict : un feedback ultérieur sur ce

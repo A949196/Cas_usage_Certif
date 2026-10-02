@@ -1,0 +1,64 @@
+name: Retrain (démonstration du mécanisme)
+#
+# Démonstration du MÉCANISME de trigger
+# Actions ne peut physiquement pas atteindre un `feedback.db` qui ne vit que
+# sur une machine locale (cf. README, section Réentraînement).
+#
+# Ce job seede un feedback.db de démonstration (quelques lignes, très sous
+# le seuil par défaut) et vérifie que `scripts/retrain.py` répond bien par
+# un skip propre (exit 0, "action": "skip") — pas un entraînement réel, qui
+# exigerait `data/dataset_trajectoire_emploi_Sujet.csv`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      min_feedback:
+        description: "Seuil de déclenchement (nombre de feedbacks non consommés)"
+        required: false
+        default: "200"
+  schedule:
+    - cron: "0 */6 * * *"
+
+jobs:
+  demo-trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Semer un feedback.db de démonstration (quelques lignes, sous le seuil)
+        run: |
+          mkdir -p data/runtime
+          python3 - <<'PY'
+          import sys
+          sys.path.insert(0, "src")
+          from trajectoire_emploi.feedback_store import (
+              initialiser_base, enregistrer_prediction, enregistrer_feedback,
+          )
+          db = "data/runtime/feedback.db"
+          initialiser_base(db)
+          features = {
+              "age": 30, "anciennete_poste_ans": 2.0, "niveau_diplome": "Bac",
+              "code_rome_vise": "D1503", "code_insee_commune": "18273",
+              "est_allocataire": True, "synthese_entretien": "demo CI",
+          }
+          enregistrer_prediction(
+              db, request_id="DEMO-CI-1", classe_predite=1, decision="retour_moyen",
+              probabilites={0: 0.3, 1: 0.4, 2: 0.3}, features=features,
+          )
+          enregistrer_feedback(db, request_id="DEMO-CI-1", true_label=1, comments=None)
+          print("1 feedback de démonstration inséré.")
+          PY
+
+      - name: Vérifier le garde-seuil (doit "skip" proprement, exit 0)
+        run: |
+          SORTIE=$(python scripts/retrain.py --min-feedback "${{ inputs.min_feedback || '200' }}" 2>&1)
+          echo "$SORTIE"
+          echo "$SORTIE" | grep -q '"action": "skip"' || { echo "Le garde-seuil n'a pas répondu comme attendu."; exit 1; }
+          echo "Mécanisme de trigger vérifié : garde-seuil opérationnel."

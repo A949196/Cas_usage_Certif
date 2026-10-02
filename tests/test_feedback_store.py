@@ -8,12 +8,24 @@ import pytest
 
 from trajectoire_emploi.feedback_store import (
     FeedbackConflictError,
+    charger_feedbacks_enrichis,
     compter_feedbacks,
     enregistrer_feedback,
     enregistrer_prediction,
     initialiser_base,
+    marquer_feedbacks_consommes,
     request_id_connu,
 )
+
+FEATURES_TEST = {
+    "age": 35,
+    "anciennete_poste_ans": 3.0,
+    "niveau_diplome": "Bac+2",
+    "code_rome_vise": "D1503",
+    "code_insee_commune": "18273",
+    "est_allocataire": True,
+    "synthese_entretien": "Candidat motivé.",
+}
 
 
 @pytest.fixture
@@ -23,13 +35,16 @@ def db_path(tmp_path: Path) -> Path:
     return path
 
 
-def _enregistrer_prediction_test(db_path: Path, request_id: str = "REQ-1") -> None:
+def _enregistrer_prediction_test(
+    db_path: Path, request_id: str = "REQ-1", features: dict | None = None
+) -> None:
     enregistrer_prediction(
         db_path,
         request_id=request_id,
         classe_predite=2,
         decision="risque_longue_duree",
         probabilites={0: 0.1, 1: 0.2, 2: 0.7},
+        features=features or FEATURES_TEST,
     )
 
 
@@ -95,5 +110,42 @@ def test_enregistrer_prediction_abstention_classe_predite_none(db_path: Path) ->
         classe_predite=None,
         decision="revue_humaine",
         probabilites={0: 0.3, 1: 0.35, 2: 0.35},
+        features=FEATURES_TEST,
     )
     assert request_id_connu(db_path, "REQ-ABSTENTION") is True
+
+
+def test_enregistrer_prediction_persiste_les_features(db_path: Path) -> None:
+    _enregistrer_prediction_test(db_path)
+    enregistrer_feedback(db_path, request_id="REQ-1", true_label=1, comments=None)
+    df = charger_feedbacks_enrichis(db_path)
+    assert len(df) == 1
+    ligne = df.iloc[0]
+    assert ligne["age"] == 35
+    assert ligne["code_rome_vise"] == "D1503"
+    assert ligne["classe_retour_emploi"] == 1
+
+
+def test_charger_feedbacks_enrichis_filtre_non_consommes(db_path: Path) -> None:
+    for i in range(2):
+        _enregistrer_prediction_test(db_path, request_id=f"REQ-{i}")
+        enregistrer_feedback(db_path, request_id=f"REQ-{i}", true_label=1, comments=None)
+
+    marquer_feedbacks_consommes(db_path, ["REQ-0"])
+
+    non_consommes = charger_feedbacks_enrichis(db_path, non_consommes_uniquement=True)
+    tous = charger_feedbacks_enrichis(db_path, non_consommes_uniquement=False)
+
+    assert len(non_consommes) == 1
+    assert non_consommes.iloc[0]["request_id"] == "REQ-1"
+    assert len(tous) == 2
+
+
+def test_charger_feedbacks_enrichis_vide(db_path: Path) -> None:
+    df = charger_feedbacks_enrichis(db_path)
+    assert len(df) == 0
+    assert "classe_retour_emploi" in df.columns
+
+
+def test_marquer_feedbacks_consommes_liste_vide_ne_leve_pas(db_path: Path) -> None:
+    marquer_feedbacks_consommes(db_path, [])  # ne doit pas lever

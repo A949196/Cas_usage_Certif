@@ -65,6 +65,11 @@ models/*.h5
 # Docker/CI puissent construire et tester l'API sans dépendre d'un run
 !models/trajectoire_emploi_v1.joblib
 
+# Candidat de réentraînement (Étape 14) — jamais versionné, régénéré par
+# scripts/retrain.py ; promotion = geste humain délibéré, pas un commit auto
+models/trajectoire_emploi_candidate.joblib
+models/trajectoire_emploi_candidate.json
+
 # Cache HuggingFace
 .cache/
 ~/.cache/huggingface/
