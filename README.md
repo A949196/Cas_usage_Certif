@@ -50,19 +50,6 @@ Limite assumée : les valeurs de la matrice (0, 1, 2, 10, 3, 0) sont une
 supérieur au reste) compte. La sensibilité à ces valeurs est testée à
 l'Étape 6 (décision D3, jamais formellement validée avec le métier).
 
-## Axes de développement (feuille de route en 8 phases)
-
-| Phase | Contenu | Partie |
-|---|---|---|
-| 1. Cadrer | besoin, tâche ML, risques éthiques | A |
-| 2. Explorer | EDA, qualité, biais | A |
-| 3. Préparer | pipeline sans fuite, scénarios | A |
-| 4. Modéliser | benchmark multi-modèles | A |
-| 5. Arbitrer | verdict multicritères, équité, coûts | A |
-| 6. Industrialiser | API, Docker, CI/CD, MLflow | B |
-| 7. Surveiller | monitoring, dérive, réentraînement | B |
-| 8. Architecturer & défendre | archi cible, dossier, soutenance | B |
-
 ## État d'avancement
 
 - [x] **Étape 0 — Inventaire** : dépôt création.
@@ -134,7 +121,8 @@ l'Étape 6 (décision D3, jamais formellement validée avec le métier).
       (pytest sur la suite complète) → job `build` (`needs: test`,
       `docker compose build` + vérification `/health` sur le conteneur
       démarré). Portée volontairement limitée au gate test→build (pas de
-      push GHCR, ce dépôt n'a pas encore de remote GitHub actif) —
+      push GHCR). Étendu depuis à l'Étape 12 (round-trip feedback,
+      santé du frontend — voir plus bas).
 - [x] **Étape 11 — MLflow** : `scripts/log_experiments_mlflow.py`
       reloggue les 5 runs d'`experiments.md` vers MLflow (params +
       métriques + tag verdict), capitalisant sur le traçage existant sans
@@ -212,6 +200,13 @@ l'Étape 6 (décision D3, jamais formellement validée avec le métier).
       fichier `feedback.db` persisté côté hôte (`data/runtime/`, non
       versionné), UI Streamlit répond (`/_stcore/health` → ok). 
       16 tests unitaires ajoutés (store + API).
+      CI étendue (`.github/workflows/ci.yml`, job `build`) : permissions
+      du volume `data/runtime` préparées pour le conteneur non-root
+      (`chmod 777`, runner éphémère), round-trip réel `/predict` →
+      `/feedback` (201 vérifié), santé du frontend vérifiée
+      (`/_stcore/health`). `httpx` épinglé explicitement dans
+      `requirements.txt` (requis en dur par `TestClient`, jusqu'ici tiré en
+      transitif via `jupyter` — fonctionnel mais fragile).
 
 **Décisions encore ouvertes** :
 - Base légale d'usage de `nationalite_hors_ue` pour l'audit d'équité.
@@ -314,8 +309,19 @@ docker compose down
 ## CI/CD
 
 `.github/workflows/ci.yml` : job `test` (pytest) → jobs `evaluate-model`
-(seuils bloquants) et `build` (Docker + `/health`), tous deux
-`needs: test`. Portée limitée au gate — pas de push vers un registre.
+(seuils bloquants) et `build`, tous deux `needs: test`. Portée limitée
+au gate — pas de push vers un registre.
+
+Le job `build` construit les images backend et frontend
+(`docker compose build`), puis vérifie réellement la stack démarrée :
+- `/health` du backend ;
+- round-trip complet `/predict` → `/feedback` (vérifie le 201, pas
+  seulement la disponibilité du service) ;
+- santé du frontend (`/_stcore/health`).
+
+Le volume `data/runtime` (store SQLite predictions/feedbacks, Étape 12)
+est préparé en écriture (`chmod 777`) avant le build — acceptable sur un
+runner éphémère, à ne pas reproduire tel quel sur un hôte de production.
 
 ```bash
 # Reproduire le gate d'évaluation continue en local :
