@@ -1,6 +1,6 @@
 """Détection de dérive — PSI / KS / Chi² et diagnostic data vs concept drift.
 
-Utilisé en §9 du notebook — **en mode batch**, jamais exposé à Grafana;
+Utilisé en §9 du notebook — **en mode batch**.
 
 Limite assumée de cette démonstration (documentée en §9 du notebook) :
 faute de trafic de production réel, les fonctions ci-dessous sont illustrées

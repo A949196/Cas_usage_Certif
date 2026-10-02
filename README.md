@@ -166,11 +166,16 @@ l'Étape 6 (décision D3, jamais formellement validée avec le métier).
       manuel ; trafic généré sur l'API réelle.
 - [x] **Étape 13.4 — Dérive (PSI/KS/Chi²) en notebook** :
       `src/trajectoire_emploi/drift.py` (PSI, KS, Chi², diagnostic data vs
-      concept drift) créé avec 11 tests. Notebook §9 : démonstration
+      concept drift) créé avec 11 tests. Démonstration
       train vs test comme proxy (pas de vrai trafic de production à
       ce stade, limite assumée explicitement) — aucun signal de dérive
       détecté (attendu sur un split stratifié propre), AUC stable
-      (0,838 → 0,856).
+      (0,838 → 0,856). Test complémentaire : `generer_trafic_test.py`
+      + `comparer_derive_production.py` — envoient un trafic
+      synthétique à l'API, puis comparent à `data/reference_set.csv`. 
+      Résultat obtenu : signal fort sur `anciennete_poste_ans` (PSI≈1,2-2,4) et `code_rome_vise`
+      (Chi² p≈0). Utile pour vérifier que le mécanisme réagit, pas pour diagnostiquer une
+      dérive réelle.
 - [x] **Étape 13.5 — Runbook + évaluation continue** :
       `RUNBOOK.md` (4 procédures : Service KO, Latence dégradée, Métrique
       modèle dégradée, Rollback) ; `scripts/evaluate_model.py` : garde-fou CI sur
@@ -248,6 +253,8 @@ observability/
 scripts/
   log_experiments_mlflow.py       reloggue experiments.md vers MLflow
   evaluate_model.py                garde-fou CI sur seuils bloquants 
+  generer_trafic_test.py            envoie un trafic synthetique a l'API reelle
+  comparer_derive_production.py     compare ce trafic a data/reference_set.csv
 RUNBOOK.md                       4 procédures d'astreinte
 data/
   reference_set.csv                jeu de référence figé (= ancien X_test, versionné)
@@ -290,6 +297,17 @@ docker compose down
 `RUNBOOK.md` : 4 procédures d'astreinte (Service KO, Latence dégradée,
 Métrique modèle dégradée, Rollback), seuils reliés aux panels Grafana
 réels.
+
+## Tester la dérive sur un trafic envoyé à l'API réelle
+
+```bash
+docker compose up --build -d
+.venv/bin/python scripts/generer_trafic_test.py --n 80
+.venv/bin/python scripts/comparer_derive_production.py
+```
+
+Il s'agit d'un trafic **synthétique** (fabriqué par le script) à l'API
+réellement déployée.
 
 ## MLflow (traçage des expériences)
 
