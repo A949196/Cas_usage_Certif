@@ -58,7 +58,7 @@ class PredictionResponse(BaseModel):
 
 
 class InfoResponse(BaseModel):
-    """Sortie de `/info` — métadonnées du modèle servi (fiche 115)."""
+    """Sortie de `/info` — métadonnées du modèle servi."""
 
     api_version: str
     model_name: str
@@ -72,3 +72,31 @@ class InfoResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: Literal["ok"]
+
+
+class FeedbackInput(BaseModel):
+    """Vérité terrain remontée par un conseiller sur un dossier déjà scoré.
+
+    `request_id` doit correspondre à une prédiction réellement servie par
+    `/predict` (sinon 404). `true_label` ∈ {0, 1, 2} (sinon 422 automatique).
+    """
+
+    request_id: str = Field(..., description="request_id renvoyé par /predict")
+    true_label: int = Field(
+        ..., ge=0, le=2, description="Vraie classe observée (0/1/2)"
+    )
+    comments: str | None = Field(None, max_length=2000)
+
+
+class FeedbackResponse(BaseModel):
+    """Sortie de `POST /feedback`."""
+
+    status: Literal["cree", "idempotent"]
+
+
+class FeedbackCountResponse(BaseModel):
+    """Sortie de `GET /feedback/count` — `new` pilote un futur trigger de
+    réentraînement, jamais `total`."""
+
+    total: int
+    new: int

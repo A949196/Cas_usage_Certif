@@ -76,5 +76,10 @@ mlartifacts/
 # Trafic de test genere par scripts/generer_trafic_test.py
 mon_trafic_envoye.csv
 
+# Store runtime (predictions servies + feedbacks conseillers) — donnee
+# generee a l'execution, jamais versionnee
+data/runtime/*
+!data/runtime/.gitkeep
+
 # Docker
 .dockerignore

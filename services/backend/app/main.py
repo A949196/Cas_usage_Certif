@@ -13,14 +13,14 @@ retour) via `prometheus-fastapi-instrumentator`.
 
 from __future__ import annotations
 
+import os
 import sys
-import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
 from loguru import logger
 from prometheus_client import Counter
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -33,6 +33,14 @@ from trajectoire_emploi.decision import (
     cout_attendu_minimal,
     decision_avec_abstention,
 )
+from trajectoire_emploi.feedback_store import (
+    FeedbackConflictError,
+    compter_feedbacks,
+    enregistrer_feedback,
+    enregistrer_prediction,
+    initialiser_base,
+    request_id_connu,
+)
 from trajectoire_emploi.features import (  
     extraire_departement,
     nettoyer_anciennete_incoherente,
@@ -42,6 +50,9 @@ from trajectoire_emploi.persistence import charger_modele
 from app.middleware import LoggingMiddleware
 from app.schemas import (
     DemandeurInput,
+    FeedbackCountResponse,
+    FeedbackInput,
+    FeedbackResponse,
     HealthResponse,
     InfoResponse,
     PredictionResponse,
@@ -49,6 +60,15 @@ from app.schemas import (
 
 MODEL_PATH = (
     Path(__file__).resolve().parents[3] / "models" / "trajectoire_emploi_v1.joblib"
+)
+
+# Store SQLite des prédictions servies + feedbacks conseillers.
+# Chemin surchargeable par variable d'environnement (tests, déploiements).
+FEEDBACK_DB_PATH = Path(
+    os.environ.get(
+        "FEEDBACK_DB_PATH",
+        str(Path(__file__).resolve().parents[3] / "data" / "runtime" / "feedback.db"),
+    )
 )
 
 LIBELLE_CLASSE = {
@@ -70,6 +90,7 @@ async def lifespan(app: FastAPI):
         app.state.model = None
         app.state.metadata = None
         logger.error(f"Modèle introuvable à {MODEL_PATH} — l'API démarre en mode dégradé")
+    initialiser_base(FEEDBACK_DB_PATH)
     yield
     app.state.model = None
 
@@ -127,8 +148,10 @@ async def info() -> InfoResponse:
 
 
 @app.post("/predict", response_model=PredictionResponse, status_code=status.HTTP_200_OK)
-async def predict(item: DemandeurInput) -> PredictionResponse:
-    request_id = str(uuid.uuid4())
+async def predict(item: DemandeurInput, request: Request) -> PredictionResponse:
+    # Même request_id que celui posé dans le header par le middleware (M5-B1) :
+    # un seul identifiant pour corréler logs, réponse et feedback ultérieur.
+    request_id = request.state.request_id
 
     if app.state.model is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Modèle non chargé")
@@ -147,8 +170,9 @@ async def predict(item: DemandeurInput) -> PredictionResponse:
     cout = float(cout_attendu_minimal(probas)[0])
 
     classes = app.state.model.classes_
+    probas_par_classe = {int(c): float(p) for c, p in zip(classes, probas[0])}
     probabilites = {
-        LIBELLE_CLASSE[int(c)]: float(p) for c, p in zip(classes, probas[0])
+        LIBELLE_CLASSE[c]: p for c, p in probas_par_classe.items()
     }
 
     if resultat == "revue_humaine":
@@ -160,6 +184,22 @@ async def predict(item: DemandeurInput) -> PredictionResponse:
 
     DECISIONS.labels(decision=decision_label).inc()
 
+    try:
+        enregistrer_prediction(
+            FEEDBACK_DB_PATH,
+            request_id=request_id,
+            classe_predite=prediction,
+            decision=decision_label,
+            probabilites=probas_par_classe,
+        )
+    except Exception:
+        # Ne bloque jamais /predict : un feedback ultérieur sur ce
+        # request_id sera simplement rejeté en 404 (journalisation prioritaire
+        # sur la disponibilité du store de feedback).
+        logger.bind(request_id=request_id).exception(
+            "Échec de la journalisation de la prédiction (store feedback)"
+        )
+
     return PredictionResponse(
         prediction=prediction,
         decision=decision_label,
@@ -168,3 +208,33 @@ async def predict(item: DemandeurInput) -> PredictionResponse:
         model_version=app.state.metadata["model_version"],
         request_id=request_id,
     )
+
+
+@app.post("/feedback", response_model=FeedbackResponse, status_code=status.HTTP_201_CREATED)
+async def post_feedback(item: FeedbackInput) -> FeedbackResponse:
+    """Enregistre la vraie classe d'un dossier déjà scoré.
+
+    404 si `request_id` ne correspond à aucune prédiction réellement servie ;
+    409 si un label différent a déjà été enregistré pour ce `request_id`
+    (contradiction — arbitrage humain requis, jamais d'écrasement silencieux).
+    """
+    if not request_id_connu(FEEDBACK_DB_PATH, item.request_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "request_id inconnu")
+
+    try:
+        statut = enregistrer_feedback(
+            FEEDBACK_DB_PATH,
+            request_id=item.request_id,
+            true_label=item.true_label,
+            comments=item.comments,
+        )
+    except FeedbackConflictError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+    return FeedbackResponse(status=statut)
+
+
+@app.get("/feedback/count", response_model=FeedbackCountResponse)
+async def feedback_count() -> FeedbackCountResponse:
+    """Total de feedbacks stockés et nombre de non-consommés (`new`)."""
+    return FeedbackCountResponse(**compter_feedbacks(FEEDBACK_DB_PATH))

@@ -192,17 +192,41 @@ l'Étape 6 (décision D3, jamais formellement validée avec le métier).
       sigma ≈ 0,043 sur 15 folds, tolérance 0,09 > 2σ. 6 tests unitaires sur la
       logique de seuils. Job CI `evaluate-model`
       (`needs: test`) branché dans `.github/workflows/ci.yml`.
+- [x] **Étape 12 — Boucle de feedback (interface conseiller)** :
+      prérequis non couvert par les fiches : store SQLite `predictions`
+      (journalise chaque décision rendue par `/predict`, sans PII ni
+      features) — nécessaire pour valider les `request_id` entrants côté
+      feedback. `POST /feedback` (adapté multiclasse 0/1/2) :
+      404 `request_id` inconnu, 422 label hors bornes (Pydantic),
+      201 nouveau/idempotent, 409 contradiction (jamais d'écrasement
+      silencieux). 
+      Stockage SQLite (préféré au CSV versionné pour l'intégrité en écriture concurrente) : table `feedbacks`(`request_id` PK, `true_label`, `comments`, `created_at`,
+      `used_for_training` défaut 0 — pilotera un futur trigger de réentraînement, jamais le total). 
+      Interface conseiller Streamlit : `services/frontend/app.py`, 2 onglets (scorer un
+      dossier / remonter un feedback), 4ᵉ service Docker. 
+      Correction de bord : le `request_id` du body `/predict` était généré
+      indépendamment de celui posé en header par le middleware (M5-B1) —
+      désormais unifié (un seul id pour logs, réponse et feedback).
+      Vérifié réellement : stack 4 services `healthy`, les 5 cas testés
+      sur le vrai conteneur (201 nouveau, 201 idempotent, 404, 409, 422),
+      fichier `feedback.db` persisté côté hôte (`data/runtime/`, non
+      versionné), UI Streamlit répond (`/_stcore/health` → ok). 
+      16 tests unitaires ajoutés (store + API).
 
 **Décisions encore ouvertes** :
 - Base légale d'usage de `nationalite_hors_ue` pour l'audit d'équité.
 - Valeur définitive du coût de l'erreur 2→0 dans la matrice de coûts
   (décision D3 — sensibilité testée en Étape 6, jamais formellement
   validée avec le métier).
-- **D6 (nouvelle)** : le coût mesuré de S2 pour le groupe hors-UE (taux
+- **D6** : le coût mesuré de S2 pour le groupe hors-UE (taux
   2→0 multiplié par 7 vs S1) est-il acceptable en
   production tel quel, ou faut-il explorer un seuil de décision différencié
   par groupe (piste non implémentée) ? Question posée au métier/DPO, en
   lien avec D5.
+- **D7** : durée de rétention des `predictions`/`feedbacks`
+  stockés (*« décider combien de temps on garde les
+  feedbacks, et pourquoi »*) — non encore tranchée, à documenter avant
+  mise en production réelle.
 
 ## Structure du dépôt
 
@@ -224,15 +248,17 @@ src/trajectoire_emploi/         code réutilisable, PARTAGÉ entre le notebook
                                  benchmark.py (comparaison scénarios × modèles),
                                  decision.py (décision à coût minimal),
                                  calibration.py (ECE, reliability diagram),
-                                 persistence.py (packaging modèle .joblib+.json),
-                                 drift.py (PSI, KS, Chi², diagnostic drift)
+                                  persistence.py (packaging modèle .joblib+.json),
+                                  drift.py (PSI, KS, Chi², diagnostic drift),
+                                  feedback_store.py (store SQLite predictions/
+                                    feedbacks conseillers)
 models/                         modèle packagé — **`.joblib` ET `.json`
-                                 versionnés** (exception ciblée au
-                                 `.gitignore`, 404 Ko, nécessaire pour que
-                                 Docker/CI fonctionnent sans dépendre d'un
-                                 run notebook complet) — artefact produit
-                                 par le notebook, consommé par
-                                 services/backend/
+                                  versionnés** (exception ciblée au
+                                  `.gitignore`, 404 Ko, nécessaire pour que
+                                  Docker/CI fonctionnent sans dépendre d'un
+                                  run notebook complet) — artefact produit
+                                  par le notebook, consommé par
+                                  services/backend/
 services/
   backend/
     app/                         API FastAPI (main.py, schemas.py, middleware.py)
@@ -241,8 +267,11 @@ services/
     Dockerfile                    image du service (python:3.11-slim, user
                                    non-root, libgomp1 pour LightGBM, healthcheck)
   frontend/
-    README.md                    réservé au Lot 3 (interface conseiller Streamlit)
-docker-compose.yml              orchestration locale (backend + prometheus + grafana)
+    app.py                       interface conseiller Streamlit :
+                                   scorer un dossier + remonter un feedback
+    requirements.txt              streamlit + httpx uniquement
+    Dockerfile                    image du service (python:3.11-slim, user non-root)
+docker-compose.yml              orchestration locale (backend + frontend + prometheus + grafana)
 observability/
   prometheus/prometheus.yml       config de scrape (cible : backend:8000/metrics)
   grafana/provisioning/
@@ -259,6 +288,8 @@ RUNBOOK.md                       4 procédures d'astreinte
 data/
   reference_set.csv                jeu de référence figé (= ancien X_test, versionné)
   reference_baseline.json          golden run gelé (métriques de référence)
+  runtime/                        store SQLite predictions/feedbacks,
+                                   jamais versionné (généré à l'exécution)
 tests/                          tests pytest (unitaires + contract test + API),
                                  centralisés (tests src/ ET services/backend/app)
 .dockerignore                   exclusions du contexte de build Docker (racine)
@@ -270,19 +301,20 @@ requirements.txt                dépendances Python dev complet (3.11+) : notebo
 ## Docker
 
 ```bash
-docker compose up --build        # backend + prometheus + grafana
-docker compose ps                 # les 3 services doivent passer "healthy"
+docker compose up --build        # backend + frontend + prometheus + grafana
+docker compose ps                 # les 4 services doivent passer "healthy"
 curl http://localhost:8000/health
 curl http://localhost:8000/metrics   # métriques Prometheus (HTTP + métier)
 curl http://localhost:9090/api/v1/targets   # vérifie que Prometheus scrape le backend
 # Grafana : http://localhost:3001 (admin/admin), datasource Prometheus préconfigurée
+# Interface conseiller : http://localhost:8501
 docker compose down
 ```
 
 ## CI/CD
 
 `.github/workflows/ci.yml` : job `test` (pytest) → jobs `evaluate-model`
-(seuils bloquants, fiche 517) et `build` (Docker + `/health`), tous deux
+(seuils bloquants) et `build` (Docker + `/health`), tous deux
 `needs: test`. Portée limitée au gate — pas de push vers un registre.
 
 ```bash
@@ -306,7 +338,7 @@ docker compose up --build -d
 .venv/bin/python scripts/comparer_derive_production.py
 ```
 
-Il s'agit d'un trafic **synthétique** (fabriqué par le script) à l'API
+Il s'agit d'un trafic synthétique (fabriqué par le script) à l'API
 réellement déployée.
 
 ## MLflow (traçage des expériences)

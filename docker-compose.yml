@@ -1,5 +1,5 @@
 # `backend`— API de scoring.
-# `frontend` rejoindra ce fichier au Lot 3 (interface conseiller, pas encore créé).
+# `frontend` — interface conseiller Streamlit.
 # `prometheus`/`grafana` — observabilité : scrape
 # `backend:8000/metrics`, dashboard provisionné (pas d'import manuel).
 
@@ -11,12 +11,36 @@ services:
     image: trajectoire-emploi-api:v0.1.0-api
     ports:
       - "8000:8000"
+    volumes:
+      # Store SQLite (prédictions servies + feedbacks conseillers) — persisté
+      # côté hôte, jamais versionné (cf. .gitignore).
+      - ./data/runtime:/home/appuser/app/data/runtime
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
       interval: 30s
       timeout: 5s
       start_period: 15s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: services/frontend/Dockerfile
+    image: trajectoire-emploi-ui:v0.1.0-ui
+    ports:
+      - "8501:8501"
+    environment:
+      API_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=2)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
       retries: 3
 
   prometheus:
