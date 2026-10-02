@@ -1,7 +1,7 @@
 # Frontend — Interface conseiller (réservé, Lot 3)
 
-Ce dossier est **réservé** pour l'interface conseiller (Lot 3 : Étape 12,
-« boucle produit »). Il est vide intentionnellement — pas de code, pas de
+Ce dossier est **réservé** pour l'interface conseiller.
+Il est vide intentionnellement — pas de code, pas de
 `Dockerfile` avant le démarrage effectif du Lot 3.
 
 ## Ce qui est prévu ici

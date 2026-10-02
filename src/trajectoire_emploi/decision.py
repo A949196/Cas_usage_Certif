@@ -51,15 +51,11 @@ def decision_avec_abstention(
     seuil_abstention: float,
     matrice: np.ndarray = MATRICE_COUTS,
 ) -> np.ndarray:
-    """Décision à coût minimal, avec abstention (fiche `725_Fallback_strategies_conception`).
+    """Décision à coût minimal, avec abstention.
 
-    Fiche appliquée : `725_Fallback_strategies_conception_essentiel.md`
-    (« seuil de rejet » : zone d'incertitude → revue humaine plutôt que
-    décision automatique forcée). Écart assumé par rapport à l'exemple
-    littéral de la fiche : celle-ci seuille sur `max(proba)` ; ici on
-    seuille sur le **coût attendu minimal** (`cout_attendu_minimal`) —
-    cohérent avec la décision à coût minimal déjà en place (un seuil sur la
-    probabilité brute ignorerait la matrice de coûts déjà justifiée).
+    « seuil de rejet » : zone d'incertitude → revue humaine plutôt que
+    décision automatique forcée. 
+    Ici on seuille sur le **coût attendu minimal** (`cout_attendu_minimal`)
 
     Retourne un tableau d'objets : soit la classe prédite (int), soit la
     chaîne `"revue_humaine"` si le coût attendu minimal dépasse le seuil.

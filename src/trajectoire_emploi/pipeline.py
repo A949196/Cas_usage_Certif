@@ -1,21 +1,16 @@
 """Construction du préprocesseur scikit-learn par scénario.
 
-Définition des 4 scénarios — reprise **au mot près** du sujet officiel
-(§3.1 du cadrage), qui prime sur toute reformulation antérieure :
-
 - **S1 (complet)** : « intégralité des variables (tabulaires + texte
   vectorisé) ».
 - **S2 (sans variables sensibles)** : S1 privé de `nationalite_hors_ue`
-  (décision D2, seule variable sensible **directe** retirée — cf. rapport
-  d'étape 4).
+  (décision D2, seule variable sensible **directe** retirée).
 - **S3 (texte seul)** : « exclusivement la synthèse écrite ».
 - **S4 (tabulaire pur)** : « uniquement l'âge, les diplômes, l'ancienneté et
   la géographie » — **volontairement plus restreint que S1 sans texte** :
   ni `code_rome_vise`, ni `est_allocataire`, ni `nationalite_hors_ue`.
 
-`anciennete_incoherente` (flag créé en Étape 3) suit partout où
-`anciennete_poste_ans` est présente : c'est une feature dérivée de la même
-variable, pas une variable indépendante du sujet.
+`anciennete_incoherente` suit partout où `anciennete_poste_ans` est présente : 
+c'est une feature dérivée de la même variable, pas une variable indépendante du sujet.
 """
 
 from __future__ import annotations

@@ -1,17 +1,14 @@
 """Garde-fou d'évaluation continue.
 
-⚠️ **Ce script ne mesure PAS la performance de généralisation du modèle.**
+**Ce script ne mesure PAS la performance de généralisation du modèle.**
 Le modèle de production (`models/trajectoire_emploi_v1.joblib`) a été réentraîné sur
 train+test combinés (§8.1) — il a donc **déjà vu** `data/reference_set.csv`
-(qui est l'ancien `X_test`/`y_test`) pendant son entraînement. Évaluer ce
-modèle sur ce jeu donne des métriques **en partie en-échantillon**,
-artificiellement hautes (F1 macro ≈ 0,94 au lieu de 0,72)
+(qui est l'ancien `X_test`/`y_test`) pendant son entraînement.
 
 **Ce que ce script détecte réellement** : une **régression de code** —
 feature engineering cassé, ordre des colonnes changé, dépendance qui
 change silencieusement le comportement de `predict_proba`, seuil de
-décision mal branché. Sur un modèle et un code inchangés, l'écart au
-golden run doit être **exactement nul**, pas « petit ».
+décision mal branché.
 
 Usage :
     # Geler le golden run (une fois, après avoir vérifié le résultat) :
@@ -59,7 +56,7 @@ TAILLE_MIN_REFERENCE = 100
 #
 # taux_erreur_2_vers_0 : le bootstrap EN-ÉCHANTILLON est dégénéré ici
 # (sigma = 0 exactement) — le modèle de production a déjà vu
-# `reference_set.csv` à l'entraînement (§8.1). 
+# `reference_set.csv` à l'entraînement. 
 # On utilise donc la meilleure variance RÉELLE disponible :
 # l'écart-type inter-folds mesuré à l'Étape 5 :
 # sigma = 0,043 → tolérance = 2 x 0,043 = 0,086 (arrondi à 0,09).
@@ -103,7 +100,7 @@ def charger_reference_set(degrade: bool = False) -> tuple[pd.DataFrame, np.ndarr
     X = df.drop(columns=["classe_retour_emploi"])
 
     if degrade:
-        # Chemin rouge volontaire (fiche 517, exercice guidé point 2) :
+        # Chemin rouge volontaire :
         # désaligne X et y pour simuler une régression de pipeline.
         rng = np.random.default_rng(0)
         y = rng.permutation(y)

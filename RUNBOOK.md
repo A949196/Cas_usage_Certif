@@ -1,13 +1,6 @@
-# Runbook d'astreinte — API `trajectoire_emploi`
-
-Fiche appliquée : `515_Runbook_astreinte_essentiel.md`. Document court,
-orienté action — se lit en 30 secondes sous stress. Pas de la doc
-exhaustive : pour chaque incident type, quoi regarder, quoi faire, qui
-appeler, et surtout **ce qu'il ne faut PAS faire**.
+# Runbook d'astreinte — API `trajectoire_emploi`.
 
 Dashboard de référence : `observability/grafana/provisioning/dashboards/trajectoire_emploi_prod.json`
-(panels Vie / Vitesse / Comportement, cf. README § Docker).
-
 ---
 
 ## 1. Service KO (le backend ne répond plus)
@@ -25,12 +18,9 @@ Dashboard de référence : `observability/grafana/provisioning/dashboards/trajec
    jamais proprement.
 4. Si KO persistant : escalade.
 
-**Qui appeler** : le mainteneur du projet (cf. §2.5 section 7 de la
-datasheet, `notebook/use_case.ipynb`).
+**Qui appeler** : maintenant du projet.
 
-**On NE fait PAS** : `docker compose down -v` (détruit les volumes —
-aucun volume de données persistantes ici, mais réflexe à proscrire
-systématiquement) ; redéployer une image non testée en urgence.
+**On NE fait PAS** : `docker compose down -v` ; redéployer une image non testée en urgence.
 
 ---
 
@@ -72,14 +62,12 @@ fiche 517).
    `data/reference_baseline.json`.
 3. Chercher ce qui a changé dans le code de service (`services/backend/app/`,
    `src/trajectoire_emploi/features.py`, `src/trajectoire_emploi/decision.py`)
-   depuis le dernier golden run vert — **jamais** dans le `.joblib` lui-même
-   (il n'a pas bougé si personne n'a relancé le packaging du notebook).
+   depuis le dernier golden run vert — **jamais** dans le `.joblib` lui-même.
 4. Corriger le code, relancer `pytest` puis `evaluate_model.py` en local
    avant de re-pousser.
 
 **Qui appeler** : mainteneur du projet — ce garde-fou ne doit **jamais**
-être contourné silencieusement (ex. augmenter les seuils pour faire
-passer la CI sans comprendre la cause).
+être contourné silencieusement.
 
 **On NE fait PAS** : relancer `--freeze-baseline` pour « faire passer » le
 garde-fou sans avoir compris la régression — ça gèle une régression comme
@@ -87,7 +75,7 @@ nouveau golden run, le garde-fou devient aveugle pour toujours.
 
 ---
 
-## 4. Rollback (revenir à la version stable précédente)
+## 4. Rollback
 
 **Déclenchement** : n'importe lequel des 3 incidents ci-dessus, non résolu
 après la procédure associée, ou dégradation confirmée en production.

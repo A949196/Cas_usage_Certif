@@ -1,8 +1,7 @@
 """Calcul du disparate impact (règle des 4/5).
 
 Réutilisé aux Étapes 2 (premier diagnostic), 3 (bilan éthique n°2) et 6
-(audit d'équité de la décision finale) du plan — c'est ce qui justifie de
-sortir cette fonction du notebook plutôt que de la dupliquer trois fois.
+(audit d'équité de la décision finale) du plan.
 """
 
 from __future__ import annotations
@@ -25,7 +24,6 @@ def taux_de_selection(
     """Taux de sélection (P(outcome positif | groupe)) par modalité de `groupe`.
 
     `est_positif` reçoit la colonne `cible` et renvoie un masque booléen
-    (ex. `lambda s: s == 0` pour « retour rapide »).
     """
     return df.groupby(groupe)[cible].apply(lambda s: est_positif(s).mean())
 
@@ -40,7 +38,6 @@ def disparate_impact(
 
     Retourne `(di, taux_de_selection_par_groupe)`. Ne conclut pas seul à une
     discrimination : DI < 0.8 est un *signal* à documenter, pas une preuve
-    (cf. fiche 202, avertissement final).
     """
     sr = taux_de_selection(df, groupe, cible, est_positif)
     di = sr.min() / sr.max()

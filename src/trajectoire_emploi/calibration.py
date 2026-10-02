@@ -3,10 +3,6 @@
 Calibration en **conception** (choisir/valider un modèle avant mise en
 production), sur des probabilités **out-of-fold** obtenues par validation
 croisée sur le train.
-
-Formule d'ECE reprise **telle quelle** de la fiche (binning en largeur
-fixe), appliquée en **one-vs-rest sur la classe 2** (la plus critique pour
-le sujet), transposée d'une cible binaire (fiche) à notre cible à 3 classes.
 """
 
 from __future__ import annotations
@@ -16,7 +12,7 @@ import pandas as pd
 
 
 def reliability_diagram_data(proba_classe: np.ndarray, y_est_classe: np.ndarray, n_bins: int = 10) -> pd.DataFrame:
-    """Données du reliability diagram (fiche 613) : confiance moyenne vs taux observé, par bin.
+    """Données du reliability diagram : confiance moyenne vs taux observé, par bin.
 
     `proba_classe` : probabilité prédite de la classe d'intérêt (ex. classe 2).
     `y_est_classe` : booléen, `y_true == classe d'intérêt`.

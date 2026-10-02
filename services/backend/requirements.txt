@@ -1,7 +1,6 @@
 # Python 3.11+ — dépendances runtime du service backend UNIQUEMENT.
 # Volontairement plus léger que le requirements.txt racine (image < 1 Go visée) : pas de
-# xgboost (le modèle final packagé est LightGBM seul), pas de pytest
-# (tests exclus de l'image de prod, cf. `.dockerignore`).
+# xgboost (le modèle final packagé est LightGBM seul)
 
 # Core ML (préprocesseur + inférence)
 pandas==2.2.2

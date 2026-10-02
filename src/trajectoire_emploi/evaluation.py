@@ -1,7 +1,6 @@
 """Métriques métier pour la cible ordinale à 3 classes.
 Les métriques « recall classe 2 », « taux d'erreur critique 2→0 » et
-« coût moyen » reprennent les définitions posées dans le cadrage (§1.4 du
-notebook).
+« coût moyen » reprennent les définitions posées dans le cadrage.
 """
 
 from __future__ import annotations

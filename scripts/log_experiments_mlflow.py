@@ -179,8 +179,8 @@ with mlflow.start_run(run_name="exp_005_production"):
     )
     mlflow.log_metrics(
         {
-            # Holdout = verdict du test scellé (§7.4), calculé AVANT la
-            # fusion train+test, jamais recalculé depuis (cf. règle anti-fuite)
+            # Holdout = verdict du test scellé, calculé AVANT la
+            # fusion train+test, jamais recalculé depuis
             "f1_macro_holdout": 0.722,
             "recall_classe_2_holdout": 0.7027027027027027,
             "kappa_pondere_holdout": 0.68826705940108,

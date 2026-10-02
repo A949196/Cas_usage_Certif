@@ -1,7 +1,7 @@
 """Contract test du modèle packagé — filet en amont des tests d'API.
 
-(`contract_test_model`). Si ce test échoue, ne pas chercher ailleurs : le
-`.joblib` packagé (§8.2 du notebook) a dérivé ou n'a pas la bonne signature.
+(`contract_test_model`). Si ce test échoue, le
+`.joblib` packagé a dérivé ou n'a pas la bonne signature.
 """
 
 from __future__ import annotations

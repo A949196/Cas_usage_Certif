@@ -1,7 +1,7 @@
 """Tests de l'API
 
 Couverture minimale : routes publiques (`/health`, `/info`, `/predict`),
-chemin d'erreur (422 sur entrée invalide), déterminisme, cas d'abstention.
+chemin d'erreur (422 sur entrée invalide)
 """
 
 from __future__ import annotations

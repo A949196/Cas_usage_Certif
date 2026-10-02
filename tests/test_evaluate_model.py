@@ -1,4 +1,4 @@
-"""Tests de la logique de seuils du garde-fou d'évaluation continue (fiche 517).
+"""Tests de la logique de seuils du garde-fou d'évaluation continue.
 
 On ne teste pas ici `calculer_metriques` (qui charge le vrai modèle — c'est
 le rôle du contract test, `tests/test_model_contract.py`), seulement la

@@ -1,15 +1,12 @@
 """Boucle de benchmark scénarios × modèles, mêmes folds pour tous.
-Règle d'or de comparabilité (même split, mêmes métriques, même prétraitement, mêmes
-hyperparamètres par défaut sauf variante annoncée) et les 5 familles de
-critères (précision, vitesse d'entraînement, vitesse d'inférence, mémoire,
-explicabilité). 
+Même split, mêmes métriques, même prétraitement, mêmes hyperparamètres.
+5 familles de critères (précision, vitesse d'entraînement, vitesse d'inférence, mémoire, explicabilité). 
 Les métriques de précision viennent de `evaluation.py` (F1 macro, recall classe 2, kappa pondéré, 
 taux d'erreur 2→0, coût moyen).
 
 Réglage des hyperparamètres volontairement **limité** : pas de recherche
 automatique (`GridSearchCV`), seulement quelques variantes manuelles
-choisies à l'avance, toujours évaluées **dans la validation croisée**
-(jamais sur le jeu de test), conformément à la règle anti-fuite.
+choisies à l'avance.
 """
 
 from __future__ import annotations
@@ -41,8 +38,7 @@ SCORING = {
     "kappa_pondere": make_scorer(kappa_pondere),
     # greater_is_better=True partout : on n'utilise pas ces scorers pour une
     # sélection automatique (pas de GridSearchCV), seulement pour peupler le
-    # tableau. « Plus bas = mieux » pour ces deux-là, à lire ainsi dans le
-    # tableau final (pas d'inversion de signe pour rester lisible).
+    # tableau. « Plus bas = mieux ».
     "taux_erreur_2_vers_0": make_scorer(taux_erreur_critique),
     "cout_moyen": make_scorer(cout_moyen),
 }

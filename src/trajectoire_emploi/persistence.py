@@ -1,8 +1,7 @@
 """Packaging du modèle final : persistance joblib + métadonnées JSON.
 
 Le `.joblib` produit contient le **pipeline scikit-learn complet**
-(préprocesseur + classifieur), jamais le classifieur seul: sinon l'API 
-devrait ré-implémenter le préprocessing à la main, source de dérive silencieuse.
+(préprocesseur + classifieur).
 
 `metrics_holdout` n'est **jamais recalculé**.
 """
@@ -41,8 +40,6 @@ def construire_metadata(
     seuil_abstention: float | None = None,
 ) -> dict[str, Any]:
     """Construit le dict de métadonnées respectant le contrat des 5 clés obligatoires.
-
-    `metrics_holdout` doit provenir du verdict du test scellé (§7.4)
     """
     metadata: dict[str, Any] = {
         "model_name": model_name,

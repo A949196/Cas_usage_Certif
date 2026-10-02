@@ -14,8 +14,7 @@ import pandas as pd
 def extraire_departement(code_insee: pd.Series) -> pd.Series:
     """Extrait le département à partir d'un code INSEE commune (5 caractères).
 
-    `code_insee` doit être de type chaîne (`string`/`str`), pas un entier
-    (sinon les zéros initiaux et les codes Corse `2A`/`2B` sont perdus).
+    `code_insee` est de type chaîne (`string`/`str`)
     """
     code = code_insee.astype("string")
     est_dom = code.str.startswith("97")
@@ -28,15 +27,12 @@ def nettoyer_anciennete_incoherente(
     age: pd.Series, anciennete_poste_ans: pd.Series
 ) -> tuple[pd.Series, pd.Series]:
     """Neutralise les valeurs d'ancienneté incohérentes avec l'âge.
-    
+
     Utilisée à la fois par le notebook (entraînement) et par l'API (inférence)
     pour garantir une parité stricte du feature engineering entre les deux
-    contextes — toute divergence se traduirait par des prédictions faussées
-    silencieusement.
+    contextes.
 
-    Retourne `(anciennete_poste_ans_nettoyee, anciennete_incoherente)`, ce
-    second vecteur étant le flag entier (`Int64`, 0/1) attendu par le
-    préprocesseur (`pipeline.py`).
+    Retourne `(anciennete_poste_ans_nettoyee, anciennete_incoherente)`
     """
     masque_incoherent = anciennete_poste_ans > (age - 15)
     anciennete_nettoyee = anciennete_poste_ans.mask(masque_incoherent, pd.NA)

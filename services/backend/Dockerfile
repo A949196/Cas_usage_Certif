@@ -1,10 +1,6 @@
 # Dockerfile du service backend (API de scoring trajectoire_emploi)
 # (base slim, user non-root, cache des layers, healthcheck).
 #
-# Contexte de build = RACINE DU DÉPÔT (pas ce dossier) : ce service dépend
-# de `src/trajectoire_emploi/` (partagé avec le notebook) et de `models/`
-# (artefact produit par le notebook) qui vivent hors de `services/backend/`
-#
 # Build :   docker build -f services/backend/Dockerfile -t trajectoire-emploi-api:v0.1.0-api .
 # Run :     docker run -d -p 8000:8000 --name trajectoire-emploi-api trajectoire-emploi-api:v0.1.0-api
 
@@ -14,8 +10,7 @@ FROM python:3.11-slim
 RUN useradd --create-home --shell /bin/bash --uid 1000 appuser
 
 # 1bis. libgomp1 : requis par LightGBM au runtime (OpenMP), absent de
-# l'image python:3.11-slim par défaut — sans lui, le chargement du
-# pipeline packagé échoue au démarrage
+# l'image python:3.11-slim par défaut
 RUN apt-get update && \
     apt-get install --no-install-recommends -y libgomp1 && \
     rm -rf /var/lib/apt/lists/*

@@ -24,9 +24,7 @@ fastapi==0.115.6
 loguru==0.7.3
 uvicorn[standard]==0.34.0
 
-# Observabilité (Étape 13.1) — dupliqué depuis services/backend/requirements.txt
-# pour que les tests (test_metrics.py, conftest.py via app.main) puissent
-# s'exécuter depuis le requirements.txt racine seul (CI, job `test`).
+# Observabilité 
 prometheus-fastapi-instrumentator==7.0.0
 prometheus-client==0.21.0
 

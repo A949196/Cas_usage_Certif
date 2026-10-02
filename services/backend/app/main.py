@@ -1,12 +1,10 @@
-"""API FastAPI — service de scoring `trajectoire_emploi` (Étape 8, Lot 1).
+"""API FastAPI — service de scoring `trajectoire_emploi`.
 
-Le modèle servi est celui packagé en §8.2 du notebook
-(`models/trajectoire_emploi_v1.joblib` + `.json`) : pipeline S2-LightGBM
+Le modèle servi est (`models/trajectoire_emploi_v1.joblib` + `.json`) : pipeline S2-LightGBM
 complet (préprocesseur + classifieur).
 
 Le feature engineering appliqué ici (département, ancienneté incohérente)
-réutilise **exactement** les mêmes fonctions que le notebook
-(`trajectoire_emploi.features`).
+réutilise **exactement** les mêmes fonctions que le notebook (`trajectoire_emploi.features`).
 
 Observabilité :
 `/metrics` expose les métriques HTTP automatiques (latence, volume, codes
@@ -31,18 +29,18 @@ SRC_DIR = Path(__file__).resolve().parents[3] / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from trajectoire_emploi.decision import (  # noqa: E402
+from trajectoire_emploi.decision import ( 
     cout_attendu_minimal,
     decision_avec_abstention,
 )
-from trajectoire_emploi.features import (  # noqa: E402
+from trajectoire_emploi.features import (  
     extraire_departement,
     nettoyer_anciennete_incoherente,
 )
-from trajectoire_emploi.persistence import charger_modele  # noqa: E402
+from trajectoire_emploi.persistence import charger_modele  
 
-from app.middleware import LoggingMiddleware  # noqa: E402
-from app.schemas import (  # noqa: E402
+from app.middleware import LoggingMiddleware
+from app.schemas import (
     DemandeurInput,
     HealthResponse,
     InfoResponse,
@@ -84,7 +82,6 @@ app = FastAPI(
 app.add_middleware(LoggingMiddleware)
 
 # Observabilité : /metrics (HTTP auto) + métrique métier.
-# include_in_schema=False : /metrics n'est pas un endpoint fonctionnel
 Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 DECISIONS = Counter(
@@ -139,7 +136,7 @@ async def predict(item: DemandeurInput) -> PredictionResponse:
     try:
         df = _construire_dataframe(item)
         probas = app.state.model.predict_proba(df)
-    except Exception as exc:  # modèle cassé, pas un problème d'entrée (déjà validée par Pydantic)
+    except Exception as exc: 
         logger.bind(request_id=request_id).exception("Échec de la prédiction")
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR, f"Échec de la prédiction : {exc}"
