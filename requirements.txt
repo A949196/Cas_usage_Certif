@@ -24,6 +24,9 @@ fastapi==0.115.6
 loguru==0.7.3
 uvicorn[standard]==0.34.0
 
+# httpx : requis en dur par starlette.testclient.TestClient (tests API).
+httpx==0.28.1
+
 # Observabilité 
 prometheus-fastapi-instrumentator==7.0.0
 prometheus-client==0.21.0
